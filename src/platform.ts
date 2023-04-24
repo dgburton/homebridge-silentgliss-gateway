@@ -32,23 +32,8 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
   public readonly accessories: PlatformAccessory[] = [];
 	address!: string;
-  authToken!: string | undefined;
   updateStateTimeout?: NodeJS.Timeout;
-  requestOptions!: {
-    method: string;
-    uri: string;
-    body?: {
-      query: string;
-      variables: {
-        position: string;
-        blinds: string;
-      };
-    };
-    json: boolean;
-    headers: {
-      Authorization: string;
-    };
-  };
+	uuidCallbacks!: object;
   
   constructor(
     public readonly log: Logger,
@@ -62,6 +47,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
     }
 
     /* setup config */
+		this.uuidCallbacks = {};
     this.config = config;
     this.log = log;
 
@@ -75,12 +61,6 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
     });
   }
-
-  configureAccessory(accessory: PlatformAccessory) {
-    this.log.info('Loading blind from cache:', accessory.displayName);
-    this.accessories.push(accessory);
-  }
-
 	
   updateState() {
 
@@ -98,9 +78,19 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 					const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid)
 
 					if (existingAccessory) {
-						this.log.info('Found existing blind from state:', existingAccessory.displayName);
+						//this.log.info('Found existing blind from state:', existingAccessory.displayName);
 
-						existingAccessory.updatePosition(Number(blind.pos_percent));
+						let func = this.uuidCallbacks[existingAccessory.UUID];
+
+						//console.log("func", func);
+
+						//console.log("this.uuidCallbacks",this.uuidCallbacks)
+
+						this.uuidCallbacks[existingAccessory.UUID](blind);
+
+						//this.log.info(this.uuidCallbacks?[existingAccessory.UUID]);
+
+						//existingAccessory.updatePosition(Number(blind.pos_percent));
 
 					}
 				});
@@ -118,10 +108,11 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 			});
 		
   }
-	
 
-
-
+  configureAccessory(accessory: PlatformAccessory) {
+    this.log.info('Loading blind from cache:', accessory.displayName);
+    this.accessories.push(accessory);
+  }
 
   discoverDevices() {
 
@@ -185,7 +176,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 														accessory.context.blind = {
 															name: blindName,
 															id: blind.id,
-															blindPosition: blind.pos_percent,
+															blindPosition: Number(blind.pos_percent),
 															model: motorInfo.model,
 															serialNumber: motorInfo.serial
 														};
@@ -221,4 +212,11 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 					});
 			});
   }
+
+	registerListenerForUUID(uuid, callback) {
+		if (this.uuidCallbacks) {
+			this.uuidCallbacks[uuid] = callback;
+		}
+	};
+
 }

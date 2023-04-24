@@ -4,6 +4,9 @@ import {
   CharacteristicValue,
   CharacteristicSetCallback,
 } from 'homebridge';
+import {
+  SilentGlissBlind,
+} from './config';
 import rp from 'request-promise';
 import { SilentGlissGatewayPlatform } from './platform';
 import { MYSMARTBLINDS_QUERIES } from './settings';
@@ -16,6 +19,7 @@ export class SilentGlissBlindsAccessory {
   platform: SilentGlissGatewayPlatform;
   accessory: PlatformAccessory;
   verboseDebug: boolean;
+	_currentPosition: number;
 
   constructor(
     platform: SilentGlissGatewayPlatform,
@@ -26,6 +30,9 @@ export class SilentGlissBlindsAccessory {
     this.model = accessory.context.blind.model;
     this.serialNumber = accessory.context.blind.serialNumber;
     this.verboseDebug = platform.config.verboseDebug || false;
+		this._currentPosition = accessory.context.blind.blindPosition;
+
+		this.platform.registerListenerForUUID(accessory.UUID, this.callBack.bind(this));
 
     accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Silent Gliss')
@@ -52,10 +59,32 @@ export class SilentGlissBlindsAccessory {
 		*/
   }
 
+	callBack(value: SilentGlissBlind) {
+		//console.log("callback", value)
+
+		let currentPosition = Number(value.pos_percent);
+
+		// TODO - update from "value.move_status" to set HomeKit to "opening" or "closing"
+		let positionState = Number(value.move_status);
+
+		if (currentPosition !== this._currentPosition) {
+			this._currentPosition = currentPosition;
+
+			if (this.verboseDebug) {
+				this.platform.log.info(`Status Update: ${this.name} updateCurrentPosition : ${currentPosition}%`);
+			}
+
+			this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
+			this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
+			this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
+		}
+    
+	}
+
   updatePosition(currentPosition: number) {
 
     if (this.verboseDebug) {
-      this.platform.log.info(`STATUS: ${this.name} updateCurrentPosition : ${currentPosition}`);
+      //this.platform.log.info(`STATUS: ${this.name} updateCurrentPosition : ${currentPosition}`);
     }
 
     this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
