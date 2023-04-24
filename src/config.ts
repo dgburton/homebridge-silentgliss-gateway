@@ -1,4 +1,5 @@
-export interface MySmartBlindsConfig {
+export interface SilentGlissConfig {
+		address?: string;
     username?: string;
     password?: string;
     closeUp?: boolean;

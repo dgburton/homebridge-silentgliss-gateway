@@ -22,7 +22,7 @@ import {
   MYSMARTBLINDS_QUERIES,
 } from './settings';
 import {
-  MySmartBlindsConfig,
+  SilentGlissConfig,
   MySmartBlindsAuth,
   MySmartBlindsBlind,
 } from './config';
@@ -53,7 +53,7 @@ export class MySmartBlindsBridgePlatform implements DynamicPlatformPlugin {
   
   constructor(
     public readonly log: Logger,
-    public readonly config: PlatformConfig & MySmartBlindsConfig,
+    public readonly config: PlatformConfig & SilentGlissConfig,
     public readonly api: API,
   ) {
     /* plugin not configured check */
