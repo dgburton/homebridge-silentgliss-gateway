@@ -1,11 +1,6 @@
 export interface SilentGlissConfig {
 		address?: string;
-    username?: string;
-    password?: string;
-    closeUp?: boolean;
-    allowDebug?: boolean;
-    statusLog?: boolean;
-    pollingInterval?: number;
+    verboseDebug?: boolean;
 }
 
 export interface MySmartBlindsAuth {

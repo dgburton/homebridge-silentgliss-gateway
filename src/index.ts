@@ -1,8 +1,8 @@
 import { API } from 'homebridge';
 
 import { PLATFORM_NAME } from './settings';
-import { MySmartBlindsBridgePlatform } from './platform'; 
+import { SilentGlissGatewayPlatform } from './platform'; 
 
 export = (api: API) => {
-  api.registerPlatform(PLATFORM_NAME, MySmartBlindsBridgePlatform);
+  api.registerPlatform(PLATFORM_NAME, SilentGlissGatewayPlatform);
 };

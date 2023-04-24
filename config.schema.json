@@ -1,7 +1,7 @@
 {
-  "pluginAlias": "MySmartBlindsBridge",
+  "pluginAlias": "homebridge-silentgliss-gateway",
   "pluginType": "platform",
-  "headerDisplay": "This plugin uses the [MySmartBlinds Smart Bridge](https://www.tiltsmarthome.com/products/smart-hub?variant=31506970148929) (sold separately from blind automation kits) to control the blinds. If you don't have the bridge, check [homebridge-mysmartblinds](https://www.npmjs.com/package/homebridge-mysmartblinds) which uses bluetooh directly to the blinds.",
+  "headerDisplay": "Silent Gliss ethernet gateway",
   "singular": true,
   "schema": {
     "type": "object",
@@ -9,60 +9,24 @@
       "name": {
         "title": "Name",
         "type": "string",
-        "default": "MySmartBlindsBridge",
+        "default": "SilentGlissGateway",
         "required": true
       },
-      "username": {
-        "title": "Username",
+      "address": {
+        "title": "Address",
+        "description": "DNS name or IP address of the Silent Gliss ethernet gateway.",
         "type": "string",
         "required": true
       },
-      "password": {
-        "title": "Password",
-        "type": "string",
-        "required": true,
-        "options": {
-          "hidden": true
-        }
-      },
-      "closeUp": {
-        "title": "Close blinds up",
-        "type": "boolean",
-        "required": false,
-        "default": false
-      },
-      "pollingInterval": {
-        "title": "Polling Interval",
-        "description": "(in minutes)",
-        "type": "integer",
-        "required": false,
-        "default": 0
-      },
-      "allowDebug": {
-        "title": "Allow Debug Logs",
-        "type": "boolean"
-      },
-      "statusLog": {
-        "title": "Status Change Logs",
+      "verboseDebug": {
+        "title": "Allow verbose debug",
         "type": "boolean"
       }
     }
   },
   "form": [
     "name",
-    "username",
-    "password",
-    "closeUp",
-    "pollingInterval",
-    {
-      "type": "fieldset",
-      "expandable": true,
-      "title": "Logs",
-      "description": "Only use if you are troubleshooting or want more information in the logs",
-      "items": [
-        "allowDebug",
-        "statusLog"
-      ]
-    }
+    "address",
+		"verboseDebug"
   ]
 }

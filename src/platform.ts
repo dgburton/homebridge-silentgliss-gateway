@@ -26,9 +26,9 @@ import {
   MySmartBlindsAuth,
   MySmartBlindsBlind,
 } from './config';
-import { MySmartBlindsAccessory } from './platformAccessory';
+import { SilentGlissBlindsAccessory } from './platformAccessory';
 
-export class MySmartBlindsBridgePlatform implements DynamicPlatformPlugin {
+export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
   public readonly accessories: PlatformAccessory[] = [];
@@ -104,7 +104,7 @@ export class MySmartBlindsBridgePlatform implements DynamicPlatformPlugin {
         headers: Object.assign({}, MYSMARTBLINDS_HEADERS, { Authorization: `Bearer ${this.authToken}` }),
       };
 
-      if (this.config.allowDebug) {
+      if (this.config.verboseDebug) {
         const authTokenExpireDate = new Date((jwt.decode(response.id_token || '{ exp: 0 }') as { exp: number }).exp * 1000).toISOString();
         this.log.info(`authToken refresh, now expires ${authTokenExpireDate}`);
       }
@@ -125,7 +125,7 @@ export class MySmartBlindsBridgePlatform implements DynamicPlatformPlugin {
       this.authTokenInterval = setInterval(this.refreshAuthToken.bind(this), 1000 * 60 * 60 * 8);
       rp(Object.assign({}, this.requestOptions, { body: { query: MYSMARTBLINDS_QUERIES.GetUserInfo, variables: null } }))
         .then((response) => {
-          if (this.config.allowDebug) {
+          if (this.config.verboseDebug) {
             this.log.debug('GetUserInfo', response.data.user);
           }
           const {
@@ -143,7 +143,7 @@ export class MySmartBlindsBridgePlatform implements DynamicPlatformPlugin {
             const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
             if (existingAccessory) {
               this.log.debug('Restore cached blind:', blindName);
-              new MySmartBlindsAccessory(this, existingAccessory);
+              new SilentGlissBlindsAccessory(this, existingAccessory);
               this.api.updatePlatformAccessories([existingAccessory]);
             } else {
             // the accessory does not yet exist, so we need to create it
@@ -170,7 +170,7 @@ export class MySmartBlindsBridgePlatform implements DynamicPlatformPlugin {
                   batteryLevel: blindState.batteryLevel as number,
                 };
         
-                new MySmartBlindsAccessory(this, accessory);
+                new SilentGlissBlindsAccessory(this, accessory);
         
                 this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
               }).catch((error) => this.log.error(error));

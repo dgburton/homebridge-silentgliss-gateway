@@ -5,32 +5,30 @@ import {
   CharacteristicSetCallback,
 } from 'homebridge';
 import rp from 'request-promise';
-import { MySmartBlindsBridgePlatform } from './platform';
+import { SilentGlissGatewayPlatform } from './platform';
 import { MYSMARTBLINDS_QUERIES } from './settings';
 
-export class MySmartBlindsAccessory {
+export class SilentGlissBlindsAccessory {
   service!: Service;
   batteryService: Service;
-  statusLog: boolean;
   pollingInterval: number;
   name: string;
   closeUp: boolean;
   macAddress: string;
-  platform: MySmartBlindsBridgePlatform;
+  platform: SilentGlissGatewayPlatform;
   accessory: PlatformAccessory;
-  allowDebug: boolean;
+  verboseDebug: boolean;
 
   constructor(
-    platform: MySmartBlindsBridgePlatform,
+    platform: SilentGlissGatewayPlatform,
     accessory: PlatformAccessory,
   ) {
     this.platform = platform;
     this.name = accessory.context.blind.name;
     this.macAddress = accessory.context.blind.macAddress;
-    this.statusLog = platform.config.statusLog || false;
     this.closeUp = platform.config.closeUp || false;
     this.pollingInterval = platform.config.pollingInterval || 0;
-    this.allowDebug = platform.config.allowDebug || false;
+    this.verboseDebug = platform.config.verboseDebug || false;
 
     accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'MySmartBlinds')
@@ -52,7 +50,7 @@ export class MySmartBlindsAccessory {
     this.accessory = accessory;
 
     if (this.pollingInterval > 0) {
-      if (this.allowDebug) {
+      if (this.verboseDebug) {
         this.platform.log.info(`Begin polling for ${this.name}`);
       }
       setTimeout(() => this.refreshBlind(), this.pollingInterval * 1000 * 60);
@@ -72,7 +70,7 @@ export class MySmartBlindsAccessory {
     if (reportCurrentPosition > 100) { reportCurrentPosition = Math.abs(reportCurrentPosition - 200); }
     /* eslint-enable brace-style */
 
-    if (this.statusLog) {
+    if (this.verboseDebug) {
       this.platform.log.info(`STATUS: ${this.name} updateCurrentPosition : ${reportCurrentPosition} (Actual ${currentPosition})`);
     }
 
@@ -129,7 +127,7 @@ export class MySmartBlindsAccessory {
   }
 
   refreshBlind() {
-    if (this.allowDebug) {
+    if (this.verboseDebug) {
       this.platform.log.info(`Refresh blind ${this.name}`);
     }
     rp(Object.assign(
