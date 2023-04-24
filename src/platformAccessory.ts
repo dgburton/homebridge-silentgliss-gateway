@@ -10,11 +10,9 @@ import { MYSMARTBLINDS_QUERIES } from './settings';
 
 export class SilentGlissBlindsAccessory {
   service!: Service;
-  batteryService: Service;
-  pollingInterval: number;
   name: string;
-  closeUp: boolean;
-  macAddress: string;
+  model: string;
+  serialNumber: string;
   platform: SilentGlissGatewayPlatform;
   accessory: PlatformAccessory;
   verboseDebug: boolean;
@@ -25,15 +23,14 @@ export class SilentGlissBlindsAccessory {
   ) {
     this.platform = platform;
     this.name = accessory.context.blind.name;
-    this.macAddress = accessory.context.blind.macAddress;
-    this.closeUp = platform.config.closeUp || false;
-    this.pollingInterval = platform.config.pollingInterval || 0;
+    this.model = accessory.context.blind.model;
+    this.serialNumber = accessory.context.blind.serialNumber;
     this.verboseDebug = platform.config.verboseDebug || false;
 
     accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'MySmartBlinds')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Blind')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.macAddress);
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Silent Gliss')
+      .setCharacteristic(this.platform.Characteristic.Model, this.model)
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.serialNumber);
 
     this.service = accessory.getService(this.platform.Service.WindowCovering) || accessory.addService(this.platform.Service.WindowCovering);
 
@@ -42,19 +39,17 @@ export class SilentGlissBlindsAccessory {
     this.service.getCharacteristic(this.platform.Characteristic.TargetPosition)
       .on('set', this.setTargetPosition.bind(this));
     this.updatePosition(accessory.context.blind.blindPosition);
-
-    this.batteryService = accessory.getService(this.platform.Service.BatteryService)
-    || accessory.addService(this.platform.Service.BatteryService, `${this.name} Battery`, `${this.macAddress} Battery`);
-    this.updateBattery(accessory.context.blind.batteryLevel);
     
     this.accessory = accessory;
 
+		/*
     if (this.pollingInterval > 0) {
       if (this.verboseDebug) {
         this.platform.log.info(`Begin polling for ${this.name}`);
       }
       setTimeout(() => this.refreshBlind(), this.pollingInterval * 1000 * 60);
     }
+		*/
   }
 
   updatePosition(currentPosition: number) {
@@ -79,33 +74,20 @@ export class SilentGlissBlindsAccessory {
     this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
   }
 
-  updateBattery(batteryLevel: number) {
-    const {
-      StatusLowBattery,
-    } = this.platform.Characteristic;
-    // value of -1 means data was not sent correctly, so ignore it for now
-
-    this.batteryService.updateCharacteristic(this.platform.Characteristic.BatteryLevel, batteryLevel < 0 ? 0 : batteryLevel);
-    this.batteryService
-      .updateCharacteristic(
-        StatusLowBattery,
-        (batteryLevel < 20 && batteryLevel !== -1) ? StatusLowBattery.BATTERY_LEVEL_LOW : StatusLowBattery.BATTERY_LEVEL_NORMAL,
-      );
-  }
-
   setTargetPosition(value: CharacteristicValue, callback: CharacteristicSetCallback) {
     const targetPosition = value as number;
     this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, targetPosition);
 
     this.platform.log.info(`${this.name} setTargetPosition to ${value}`);
 
+		/*
     rp(Object.assign(
       {},
       this.platform.requestOptions,
       {
         body: {
           query: MYSMARTBLINDS_QUERIES.UpdateBlindsPosition,
-          variables: { position: this.closeUp ? (Math.abs(targetPosition - 200)) : targetPosition, blinds: this.macAddress },
+          variables: { position: this.closeUp ? (Math.abs(targetPosition - 200)) : targetPosition, blinds: this.serialNumber },
         },
         resolveWithFullResponse: true,
       },
@@ -124,16 +106,19 @@ export class SilentGlissBlindsAccessory {
         this.platform.log.error(`${this.name} setTargetPosition ERROR`, err.statusCode);
         callback(null);
       });
+
+			*/
   }
 
   refreshBlind() {
+		/*
     if (this.verboseDebug) {
       this.platform.log.info(`Refresh blind ${this.name}`);
     }
     rp(Object.assign(
       {},
       this.platform.requestOptions,
-      { body: { query: MYSMARTBLINDS_QUERIES.GetBlindSate, variables: { blinds: this.macAddress } }, resolveWithFullResponse: true },
+      { body: { query: MYSMARTBLINDS_QUERIES.GetBlindSate, variables: { blinds: this.serialNumber } }, resolveWithFullResponse: true },
     )).then((response) => {
       const blindState = response.body.data.blindsState[0];
       this.updatePosition(this.platform.convertPosition(blindState.position));
@@ -145,5 +130,6 @@ export class SilentGlissBlindsAccessory {
       }
       setTimeout(() => this.refreshBlind(), refreshBlindTimeOut);
     }).catch((err) => this.platform.log.error(`${this.name} refreshBlind ERROR`, err.statusCode));
+		*/
   }
 }

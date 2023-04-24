@@ -23,8 +23,7 @@ import {
 } from './settings';
 import {
   SilentGlissConfig,
-  MySmartBlindsAuth,
-  MySmartBlindsBlind,
+  SilentGlissBlind,
 } from './config';
 import { SilentGlissBlindsAccessory } from './platformAccessory';
 
@@ -32,7 +31,6 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
   public readonly accessories: PlatformAccessory[] = [];
-  auth!: MySmartBlindsAuth;
 	address!: string;
   authToken!: string | undefined;
   authTokenInterval?: NodeJS.Timeout;
@@ -67,15 +65,6 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
     this.config = config;
     this.log = log;
 
-    try {
-      if (!this.config.address) {
-        throw new Error('Silent Gliss Gateway - You must provide an address');
-      }
-      this.address = this.config.address;
-    } catch(err) {
-      //this.log.error(err);
-    }
-
     this.log.debug('Finished initializing platform:', this.config.name);
 
     this.api.on('didFinishLaunching', () => {
@@ -89,6 +78,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
     this.accessories.push(accessory);
   }
 
+	/*
   refreshAuthToken() {
     return rp({
       method: 'POST',
@@ -110,6 +100,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
       }
     });
   }
+	*/
 
   convertPosition(blindPosition: string) {
     let convertedPosition = parseInt(blindPosition);
@@ -121,75 +112,101 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   }
 
   discoverDevices() {
-    this.refreshAuthToken().then(() => {
-      this.authTokenInterval = setInterval(this.refreshAuthToken.bind(this), 1000 * 60 * 60 * 8);
-      rp(Object.assign({}, this.requestOptions, { body: { query: MYSMARTBLINDS_QUERIES.GetUserInfo, variables: null } }))
-        .then((response) => {
-          if (this.config.verboseDebug) {
-            this.log.debug('GetUserInfo', response.data.user);
-          }
-          const {
-            rooms,
-            blinds,
-          } = response.data.user;
 
-          const activeBlinds = blinds.filter((blind: MySmartBlindsBlind) => !blind.deleted);
-          const deletedBlinds = blinds.filter((blind: MySmartBlindsBlind) => blind.deleted);
+		rp(`http://${this.config.address}/room.json`)
+			.then((response) => {
+				const rooms = JSON.parse(response).room;
+				rp(`http://${this.config.address}/location.json`)
+					.then((response) => {
+						const locations = JSON.parse(response).location;
+						rp(`http://${this.config.address}/glue.json`)
+							.then((response) => {
+								const glues = JSON.parse(response).glue;
+								rp(`http://${this.config.address}/motor_fixed.json`)
+									.then((response) => {
+										const mfixed = JSON.parse(response).mfixed;
+										rp(`http://${this.config.address}/motor_status.json`)
+											.then((response) => {
+												const mstatus = JSON.parse(response).mstatus;
 
-          activeBlinds.forEach((blind: MySmartBlindsBlind) => {
-            const uuid = this.api.hap.uuid.generate(blind.encodedMacAddress);
-            const blindName = `${rooms.find((room: { id: number }) => room.id === blind.roomId).name} ${blind.name}`;
+												const activeBlinds = mstatus.filter((blind: SilentGlissBlind) => blind.visible === '1');
+												const deletedBlinds = mstatus.filter((blind: SilentGlissBlind) => blind.visible === '0');
 
-            const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-            if (existingAccessory) {
-              this.log.debug('Restore cached blind:', blindName);
-              new SilentGlissBlindsAccessory(this, existingAccessory);
-              this.api.updatePlatformAccessories([existingAccessory]);
-            } else {
-            // the accessory does not yet exist, so we need to create it
-              this.log.info('Adding new blind:', blindName);
-        
-              // create a new accessory
-              const accessory = new this.api.platformAccessory(blindName, uuid);
-              rp(Object.assign(
-                {},
-                this.requestOptions,
-                { body: { query: MYSMARTBLINDS_QUERIES.GetBlindSate, variables: { blinds: blind.encodedMacAddress } } },
-              )).then((response) => {
-                const blindState = get(response, 'data.blindsState[0]', { position: 0, batteryLevel: 0 });
+												if (this.config.verboseDebug) {
+													//this.log.debug('activeBlinds', activeBlinds);
+													//this.log.debug('deletedBlinds', deletedBlinds);
+												}
 
-                if (blindState.batteryLevel <= 0) {
-                  this.log.error(`${blindName} state fetch failed.  Do you have the Hardware bridge? Is the battery charged?`);
-                }
+												activeBlinds.forEach((blind: SilentGlissBlind) => {
 
-                const homeKitBlindPosition = this.convertPosition(blindState.position);
-                accessory.context.blind = {
-                  name: blindName,
-                  macAddress: blind.encodedMacAddress,
-                  blindPosition: homeKitBlindPosition,
-                  batteryLevel: blindState.batteryLevel as number,
-                };
-        
-                new SilentGlissBlindsAccessory(this, accessory);
-        
-                this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-              }).catch((error) => this.log.error(error));
-            }
-          });
-          deletedBlinds.forEach((blind) => {
-            const uuid = this.api.hap.uuid.generate(blind.encodedMacAddress);
-            const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-            const inActive = activeBlinds.findIndex(
-              (activeBlind: MySmartBlindsBlind) => blind.encodedMacAddress === activeBlind.encodedMacAddress,
-            ) > -1;
+													const uuid = this.api.hap.uuid.generate(blind.id);
 
-            if (existingAccessory && !inActive) {
-              this.accessories.splice(this.accessories.findIndex(acc => acc.UUID === existingAccessory.UUID), 1);
-              this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-              this.log.info('Deleted blind from cache:', existingAccessory.displayName);
-            }
-          });
-        });
-    });
+													const glue = glues.find((g: { mid: string }) => g.mid === blind.id);
+													const location = locations.find((l: { id: string }) => l.id === glue.lid);
+													const motorInfo = mfixed.find((mi: { id: string }) => mi.id === blind.id);
+
+													if (this.config.verboseDebug) {
+														//console.log("blind", blind);
+														//console.log("motorInfo", motorInfo);
+														//console.log("glue", glue);
+														//console.log("location", location);
+													}
+
+													const blindName = `${location.name}`;
+													if (this.config.verboseDebug) {
+														//console.log(`${uuid} - ${blind.id} - ${blindName}`);
+													}
+
+													const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+													if (existingAccessory) {
+														this.log.debug('Restore cached blind:', blindName);
+														new SilentGlissBlindsAccessory(this, existingAccessory);
+														this.api.updatePlatformAccessories([existingAccessory]);
+													} else {
+														// the accessory does not yet exist, so we need to create it
+														this.log.info('Adding new blind:', blindName);
+											
+														// create a new accessory
+														const accessory = new this.api.platformAccessory(blindName, uuid);
+
+														//const homeKitBlindPosition = this.convertPosition(blindState.position);
+														accessory.context.blind = {
+															name: blindName,
+															id: blind.id,
+															blindPosition: blind.pos_percent,
+															model: motorInfo.model,
+															serialNumber: motorInfo.serial
+														};
+										
+														new SilentGlissBlindsAccessory(this, accessory);
+										
+														this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+
+													}
+
+
+												});
+
+												/*
+												deletedBlinds.forEach((blind) => {
+													const uuid = this.api.hap.uuid.generate(blind.encodedMacAddress);
+													const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+													const inActive = activeBlinds.findIndex(
+														(activeBlind: SilentGlissBlind) => blind.encodedMacAddress === activeBlind.encodedMacAddress,
+													) > -1;
+
+													if (existingAccessory && !inActive) {
+														this.accessories.splice(this.accessories.findIndex(acc => acc.UUID === existingAccessory.UUID), 1);
+														this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+														this.log.info('Deleted blind from cache:', existingAccessory.displayName);
+													}
+												});
+												*/
+											
+											});
+									});
+							});
+					});
+			});
   }
 }

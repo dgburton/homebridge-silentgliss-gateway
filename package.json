@@ -1,7 +1,7 @@
 {
   "name": "homebridge-silentgliss-gateway",
   "displayName": "Homebridge Silent Gliss Gateway",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Homebrige plugin for Silent Gliss ethernet gateway",
   "keywords": [
     "homebridge-plugin",
@@ -39,7 +39,6 @@
     "lint:fix": "eslint src/**.ts --max-warnings=0 --fix",
     "watch": "npm run build && npm link && nodemon",
     "build": "rimraf ./dist && tsc",
-    "test:silentgliss-login": "npm run build && node ./dist/test.js",
     "prepublishOnly": "npm run lint && npm run build",
     "release": "standard-version"
   },
@@ -54,8 +53,5 @@
     "url": "https://github.com/dgburton/homebridge-silentgliss-gateway/issues"
   },
   "main": "dist/index.js",
-  "bin": {
-    "homebridge-silentgliss-gateway": "./test.js"
-  },
   "license": "MIT"
 }
