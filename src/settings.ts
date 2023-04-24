@@ -1,6 +1,6 @@
 /* Plugin Infrmation */
-export const PLATFORM_NAME = 'MySmartBlindsBridge';
-export const PLUGIN_NAME = 'homebridge-mysmartblinds-bridge';
+export const PLATFORM_NAME = 'SilentGlissGateway';
+export const PLUGIN_NAME = 'homebridge-silentgliss-gateway';
 
 /* MySmartBlinds App Settings */
 export const MYSMARTBLINDS_DOMAIN = 'mysmartblinds.auth0.com';

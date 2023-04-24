@@ -33,6 +33,7 @@ export class MySmartBlindsBridgePlatform implements DynamicPlatformPlugin {
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
   public readonly accessories: PlatformAccessory[] = [];
   auth!: MySmartBlindsAuth;
+	address!: string;
   authToken!: string | undefined;
   authTokenInterval?: NodeJS.Timeout;
   requestOptions!: {
@@ -67,18 +68,12 @@ export class MySmartBlindsBridgePlatform implements DynamicPlatformPlugin {
     this.log = log;
 
     try {
-      if (!this.config.username) {
-        throw new Error('MySmartBlinds Bridge - You must provide a username');
+      if (!this.config.address) {
+        throw new Error('Silent Gliss Gateway - You must provide an address');
       }
-      if (!this.config.password) {
-        throw new Error('MySmartBlinds Bridge - You must provide a password');
-      }
-      this.auth = {
-        username: this.config.username,
-        password: this.config.password,
-      };
+      this.address = this.config.address;
     } catch(err) {
-      this.log.error(err);
+      //this.log.error(err);
     }
 
     this.log.debug('Finished initializing platform:', this.config.name);

@@ -1,8 +1,8 @@
 {
-  "name": "homebridge-mysmartblinds-bridge",
-  "displayName": "Homebridge MySmartBlinds Bridge",
+  "name": "homebridge-silentgliss-gateway",
+  "displayName": "Homebridge Silent Gliss Gateway",
   "version": "2.2.9",
-  "description": "Homebrige plugin for mysmartblinds (using hardware bridge)",
+  "description": "Homebrige plugin for Silent Gliss ethernet gateway",
   "keywords": [
     "homebridge-plugin",
     "mysmartblinds",
@@ -45,28 +45,18 @@
     "release": "standard-version"
   },
   "author": {
-    "name": "Alex 'apexad' Martin"
+    "name": "Dan Burton"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/apexad/homebridge-mysmartblinds-bridge.git"
+    "url": "git://github.com/dgburton/homebridge-silentgliss-gateway"
   },
   "bugs": {
-    "url": "https://github.com/apexad/homebridge-mysmartblinds-bridge/issues"
+    "url": "https://github.com/dgburton/homebridge-silentgliss-gateway/issues"
   },
   "main": "dist/index.js",
   "bin": {
     "homebridge-mysmartblinds-bridge": "./test.js"
   },
-  "funding": [
-    {
-      "type": "paypal",
-      "url": "https://www.paypal.me/apexadm"
-    },
-    {
-      "type": "github",
-      "url": "https://github.com/sponsors/apexad"
-    }
-  ],
   "license": "MIT"
 }
