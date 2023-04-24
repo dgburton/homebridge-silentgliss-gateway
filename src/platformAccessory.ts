@@ -53,24 +53,13 @@ export class SilentGlissBlindsAccessory {
   }
 
   updatePosition(currentPosition: number) {
-    let reportCurrentPosition = currentPosition;
-
-    /* eslint-disable brace-style */
-    // fix for blinds opned with finger via app
-    if (reportCurrentPosition === 99) { reportCurrentPosition = 100; }
-
-    // fix for blinds closed wth finger via app (1) or error (-1)
-    if (reportCurrentPosition === 1 || reportCurrentPosition === -1) { reportCurrentPosition = 0; }
-    // fix for MySmartBlinds being range 0 to 200 and Homebridge 0 to 100
-    if (reportCurrentPosition > 100) { reportCurrentPosition = Math.abs(reportCurrentPosition - 200); }
-    /* eslint-enable brace-style */
 
     if (this.verboseDebug) {
-      this.platform.log.info(`STATUS: ${this.name} updateCurrentPosition : ${reportCurrentPosition} (Actual ${currentPosition})`);
+      this.platform.log.info(`STATUS: ${this.name} updateCurrentPosition : ${currentPosition}`);
     }
 
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, reportCurrentPosition);
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, reportCurrentPosition);
+    this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
+    this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
     this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
   }
 

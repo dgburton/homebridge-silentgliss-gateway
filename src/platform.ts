@@ -15,7 +15,7 @@ import {
 import {
   PLATFORM_NAME,
   PLUGIN_NAME,
-  MYSMARTBLINDS_DOMAIN,
+  STATE_REFRESH_INTERVAL_MS,
   MYSMARTBLINDS_OPTIONS,
   MYSMARTBLINDS_HEADERS,
   MYSMARTBLINDS_GRAPHQL,
@@ -33,7 +33,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   public readonly accessories: PlatformAccessory[] = [];
 	address!: string;
   authToken!: string | undefined;
-  authTokenInterval?: NodeJS.Timeout;
+  updateStateTimeout?: NodeJS.Timeout;
   requestOptions!: {
     method: string;
     uri: string;
@@ -70,6 +70,9 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       this.log.debug('Executed didFinishLaunching callback');
       this.discoverDevices();
+
+			this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
+
     });
   }
 
@@ -78,38 +81,47 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
     this.accessories.push(accessory);
   }
 
-	/*
-  refreshAuthToken() {
-    return rp({
-      method: 'POST',
-      uri: `https://${MYSMARTBLINDS_DOMAIN}/oauth/ro`,
-      json: true,
-      body: Object.assign({}, MYSMARTBLINDS_OPTIONS, this.auth),
-    }).then((response) => {
-      this.authToken = response.id_token;
-      this.requestOptions = {
-        method: 'POST',
-        uri: MYSMARTBLINDS_GRAPHQL,
-        json: true,
-        headers: Object.assign({}, MYSMARTBLINDS_HEADERS, { Authorization: `Bearer ${this.authToken}` }),
-      };
+	
+  updateState() {
 
-      if (this.config.verboseDebug) {
-        const authTokenExpireDate = new Date((jwt.decode(response.id_token || '{ exp: 0 }') as { exp: number }).exp * 1000).toISOString();
-        this.log.info(`authToken refresh, now expires ${authTokenExpireDate}`);
-      }
-    });
+		clearTimeout(this.updateStateTimeout);
+
+    rp(`http://${this.config.address}/motor_status.json`)
+			.then((response) => {
+
+				const mstatus = JSON.parse(response).mstatus;
+
+				const activeBlinds = mstatus.filter((blind: SilentGlissBlind) => blind.visible === '1');
+
+				activeBlinds.forEach((blind) => {
+					const uuid = this.api.hap.uuid.generate(blind.id);
+					const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid)
+
+					if (existingAccessory) {
+						this.log.info('Found existing blind from state:', existingAccessory.displayName);
+
+						existingAccessory.updatePosition(Number(blind.pos_percent));
+
+					}
+				});
+
+				/*if (this.config.verboseDebug) {
+
+					console.log("mstatus", mstatus)
+					const activeBlinds = mstatus.filter((blind: SilentGlissBlind) => blind.visible === '1');
+					this.log.debug('updateState.activeBlinds', activeBlinds);
+
+				}*/
+
+			}).finally(() => {
+				this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
+			});
+		
   }
-	*/
+	
 
-  convertPosition(blindPosition: string) {
-    let convertedPosition = parseInt(blindPosition);
 
-    if (this.config.closeUp && convertedPosition > 100) {
-      convertedPosition = Math.abs(convertedPosition - 200);
-    }
-    return convertedPosition;
-  }
+
 
   discoverDevices() {
 
