@@ -1,7 +1,7 @@
 {
   "name": "homebridge-silentgliss-gateway",
   "displayName": "Homebridge Silent Gliss Gateway",
-  "version": "2.2.9",
+  "version": "1.0.0",
   "description": "Homebrige plugin for Silent Gliss ethernet gateway",
   "keywords": [
     "homebridge-plugin",
