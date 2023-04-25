@@ -20,6 +20,7 @@ export class SilentGlissBlindsAccessory {
   accessory: PlatformAccessory;
   verboseDebug: boolean;
 	_currentPosition: number;
+	_moveStatus: number;
 
   constructor(
     platform: SilentGlissGatewayPlatform,
@@ -31,6 +32,7 @@ export class SilentGlissBlindsAccessory {
     this.serialNumber = accessory.context.blind.serialNumber;
     this.verboseDebug = platform.config.verboseDebug || false;
 		this._currentPosition = accessory.context.blind.blindPosition;
+		this._moveStatus = accessory.context.blind.moveStatus;
 
 		this.platform.registerListenerForUUID(accessory.UUID, this.callBack.bind(this));
 
@@ -45,39 +47,46 @@ export class SilentGlissBlindsAccessory {
 
     this.service.getCharacteristic(this.platform.Characteristic.TargetPosition)
       .on('set', this.setTargetPosition.bind(this));
-    this.updatePosition(accessory.context.blind.blindPosition);
+    //this.updatePosition(accessory.context.blind.blindPosition);
     
     this.accessory = accessory;
 
-		/*
-    if (this.pollingInterval > 0) {
-      if (this.verboseDebug) {
-        this.platform.log.info(`Begin polling for ${this.name}`);
-      }
-      setTimeout(() => this.refreshBlind(), this.pollingInterval * 1000 * 60);
-    }
-		*/
   }
 
 	callBack(value: SilentGlissBlind) {
-		//console.log("callback", value)
 
 		let currentPosition = Number(value.pos_percent);
-
-		// TODO - update from "value.move_status" to set HomeKit to "opening" or "closing"
-		let positionState = Number(value.move_status);
-
 		if (currentPosition !== this._currentPosition) {
-			this._currentPosition = currentPosition;
-
 			if (this.verboseDebug) {
-				this.platform.log.info(`Status Update: ${this.name} updateCurrentPosition : ${currentPosition}%`);
+				this.platform.log.info(`Status Update: ${this.name} Current Position : ${currentPosition}%`);
 			}
-
-			this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
+			this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition); // do we need to update this?
 			this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
-			this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
+
+			if (currentPosition > this._currentPosition) {
+				this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
+				if (this.verboseDebug) {
+					this.platform.log.info(`Status Update: ${this.name} Position State : DECREASING`);
+				}
+				
+			} else if (currentPosition < this._currentPosition) {
+				this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
+				if (this.verboseDebug) {
+					this.platform.log.info(`Status Update: ${this.name} Position State : INCREASING`);
+				}
+
+			} else {
+				this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
+				if (this.verboseDebug) {
+					this.platform.log.info(`Status Update: ${this.name} Position State : STOPPED`);
+				}
+
+			}
+			this._currentPosition = currentPosition;
 		}
+
+
+
     
 	}
 
@@ -128,26 +137,4 @@ export class SilentGlissBlindsAccessory {
 			*/
   }
 
-  refreshBlind() {
-		/*
-    if (this.verboseDebug) {
-      this.platform.log.info(`Refresh blind ${this.name}`);
-    }
-    rp(Object.assign(
-      {},
-      this.platform.requestOptions,
-      { body: { query: MYSMARTBLINDS_QUERIES.GetBlindSate, variables: { blinds: this.serialNumber } }, resolveWithFullResponse: true },
-    )).then((response) => {
-      const blindState = response.body.data.blindsState[0];
-      this.updatePosition(this.platform.convertPosition(blindState.position));
-      this.updateBattery(blindState.batteryLevel as number);
-      let refreshBlindTimeOut = this.pollingInterval * 1000 * 60; // convert minutes to milliseconds
-      if (response.headers['x-ratelimit-reset']) {
-        refreshBlindTimeOut = new Date(parseInt(response.headers['x-ratelimit-reset']) * 1000).getTime() - new Date().getTime();
-        this.platform.log.warn(`Rate Limit reached, refresh for ${this.name} delay to ${new Date(response.headers['x-ratelimit-reset'])}`);
-      }
-      setTimeout(() => this.refreshBlind(), refreshBlindTimeOut);
-    }).catch((err) => this.platform.log.error(`${this.name} refreshBlind ERROR`, err.statusCode));
-		*/
-  }
 }

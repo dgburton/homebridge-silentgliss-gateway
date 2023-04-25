@@ -64,6 +64,8 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 	
   updateState() {
 
+		this.log.info('updateState');
+
 		clearTimeout(this.updateStateTimeout);
 
     rp(`http://${this.config.address}/motor_status.json`)
@@ -114,7 +116,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   }
 
   configureAccessory(accessory: PlatformAccessory) {
-    this.log.info('Loading blind from cache:', accessory.displayName);
+    //this.log.info('Loading blind from cache:', accessory.displayName);
     this.accessories.push(accessory);
   }
 
@@ -166,7 +168,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
 													const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 													if (existingAccessory) {
-														this.log.debug('Restore cached blind:', blindName);
+														//this.log.debug('Restore cached blind:', blindName);
 														new SilentGlissBlindsAccessory(this, existingAccessory);
 														this.api.updatePlatformAccessories([existingAccessory]);
 													} else {
@@ -181,6 +183,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 															name: blindName,
 															id: blind.id,
 															blindPosition: Number(blind.pos_percent),
+															moveStatus: Number(blind.move_status),
 															model: motorInfo.model,
 															serialNumber: motorInfo.serial
 														};
