@@ -48,6 +48,9 @@ export class SilentGlissBlindsAccessory {
     this.service.getCharacteristic(this.platform.Characteristic.TargetPosition)
       .on('set', this.setTargetPosition.bind(this));
     //this.updatePosition(accessory.context.blind.blindPosition);
+		this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, accessory.context.blind.blindPosition);
+    this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, accessory.context.blind.blindPosition);
+    this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
     
     this.accessory = accessory;
 
@@ -55,51 +58,84 @@ export class SilentGlissBlindsAccessory {
 
 	callBack(value: SilentGlissBlind) {
 
-		let currentPosition = Number(value.pos_percent);
-		if (currentPosition !== this._currentPosition) {
-			if (this.verboseDebug) {
-				this.platform.log.info(`Status Update: ${this.name} Current Position : ${currentPosition}%`);
-			}
-			this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition); // do we need to update this?
-			this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
+		try {
 
-			if (currentPosition > this._currentPosition) {
-				this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
-				if (this.verboseDebug) {
-					this.platform.log.info(`Status Update: ${this.name} Position State : DECREASING`);
+			let currentPosition = Number(value.pos_percent);
+			let moveStatus = Number(value.move_status);
+
+			//console.log("moveStatus", moveStatus);
+
+			if (moveStatus !== this._moveStatus) {
+				if (moveStatus === 4) {
+					// blind stopped
+					this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
+					this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
+					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
+
+				} else if (moveStatus === 2) {
+					// blind going down
+					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
+
+				} else if (moveStatus === 1) {
+					// blind going up
+					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
+
 				}
-				
-			} else if (currentPosition < this._currentPosition) {
-				this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
+
+				this._moveStatus = moveStatus;
+			}
+
+			if (currentPosition !== this._currentPosition) {
+				/*
+				this._currentPosition = currentPosition;
+
+				this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
+				this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
+				this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
+
 				if (this.verboseDebug) {
-					this.platform.log.info(`Status Update: ${this.name} Position State : INCREASING`);
+					this.platform.log.info(`Status Update: ${this.name} Current Position : ${currentPosition}%`);
 				}
+				*/
+
+
+				/*
+
+
+				if (currentPosition > this._currentPosition) {
+					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
+					if (this.verboseDebug) {
+						this.platform.log.info(`Status Update: ${this.name} Position State : DECREASING`);
+					}
+					
+				} else if (currentPosition < this._currentPosition) {
+					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
+					if (this.verboseDebug) {
+						this.platform.log.info(`Status Update: ${this.name} Position State : INCREASING`);
+					}
+
+				} else {
+					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
+					if (this.verboseDebug) {
+						this.platform.log.info(`Status Update: ${this.name} Position State : STOPPED`);
+					}
+
+				}
+				*/
 
 			} else {
-				this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
-				if (this.verboseDebug) {
-					this.platform.log.info(`Status Update: ${this.name} Position State : STOPPED`);
-				}
-
+				//this.platform.log.info(`_currentPosition: ${this._currentPosition} equals currentPosition : ${currentPosition}%`);
 			}
-			this._currentPosition = currentPosition;
+
+
+
+			
+		} catch(e) {
+			console.error('callback error', e);
 		}
 
-
-
-    
 	}
 
-  updatePosition(currentPosition: number) {
-
-    if (this.verboseDebug) {
-      //this.platform.log.info(`STATUS: ${this.name} updateCurrentPosition : ${currentPosition}`);
-    }
-
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
-    this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
-  }
 
   setTargetPosition(value: CharacteristicValue, callback: CharacteristicSetCallback) {
     const targetPosition = value as number;
@@ -107,26 +143,27 @@ export class SilentGlissBlindsAccessory {
 
     this.platform.log.info(`${this.name} setTargetPosition to ${value}`);
 
-		/*
-    rp(Object.assign(
-      {},
-      this.platform.requestOptions,
-      {
-        body: {
-          query: MYSMARTBLINDS_QUERIES.UpdateBlindsPosition,
-          variables: { position: this.closeUp ? (Math.abs(targetPosition - 200)) : targetPosition, blinds: this.serialNumber },
-        },
-        resolveWithFullResponse: true,
-      },
-    ))
+		let body = `command=[{"action":"moveto","mid":${this.accessory.context.blind.id},"position":"${value}"}]`;
+		
+    rp(
+			{
+        method: 'POST',
+        uri: `http://${this.platform.config.address}/command.jcf`,
+				headers: {
+					'Content-Type': 'text/plain',
+					'Content-Length': body.length
+				},
+        body: body,
+      }
+    )
       .then((response) => {
-        // update battery level since we just ran the motor a bit
-        this.updateBattery(response.body.data.updateBlindsPosition[0].batteryLevel as number);
+
+				//console.log('response', response)
 
         // update current position
-        this.updatePosition(targetPosition);
+        //this.updatePosition(targetPosition);
         
-        this.platform.log.info(`${this.name} currentPosition is now ${targetPosition}`);
+        //this.platform.log.info(`${this.name} currentPosition is now ${targetPosition}`);
         callback(null);
       })
       .catch((err) => {
@@ -134,7 +171,9 @@ export class SilentGlissBlindsAccessory {
         callback(null);
       });
 
-			*/
   }
 
 }
+
+
+
