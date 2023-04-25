@@ -103,6 +103,9 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
 				}*/
 
+			}).catch((e) => {
+				this.log.error('updateState', e);
+
 			}).finally(() => {
 				this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
 			});
