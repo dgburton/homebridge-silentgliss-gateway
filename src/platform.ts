@@ -187,7 +187,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 													} else {
 														// the accessory does not yet exist, so we need to create it
 
-														if ( (glue.mid === "34") || (glue.mid === "39") ) {
+														//if ( (glue.mid === "34") || (glue.mid === "39") ) {
 														this.log.info('Adding new blind:', blindName);
 											
 														// create a new accessory
@@ -206,7 +206,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 														new SilentGlissBlindsAccessory(this, accessory);
 										
 														this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-														}
+														//}
 
 													}
 
