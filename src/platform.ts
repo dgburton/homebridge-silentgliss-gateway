@@ -80,13 +80,14 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 					if (existingAccessory) {
 						//this.log.info('Found existing blind from state:', existingAccessory.displayName);
 
-						let func = this.uuidCallbacks[existingAccessory.UUID];
+						//let func = this.uuidCallbacks[existingAccessory.UUID];
 
 						//console.log("func", func);
 
 						//console.log("this.uuidCallbacks",this.uuidCallbacks)
 
-						this.uuidCallbacks[existingAccessory.UUID](blind);
+						if (this.uuidCallbacks[existingAccessory.UUID])
+							this.uuidCallbacks[existingAccessory.UUID](blind);
 
 						//this.log.info(this.uuidCallbacks?[existingAccessory.UUID]);
 
