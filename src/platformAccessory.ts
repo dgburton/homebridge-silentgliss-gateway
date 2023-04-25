@@ -72,18 +72,22 @@ export class SilentGlissBlindsAccessory {
 					this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
 					this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
 					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
+					this.platform.log.info(`${this.name} Move Status: STOPPED`);
 
 				} else if (moveStatus === 2) {
 					// blind going down
 					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
+					this.platform.log.info(`${this.name} Move Status: DECREASING`);
 
 				} else if (moveStatus === 1) {
 					// blind going up
 					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
+					this.platform.log.info(`${this.name} Move Status: INCREASING`);
 
 				}
 
 				this._moveStatus = moveStatus;
+
 			}
 
 			if (currentPosition !== this._currentPosition) {
