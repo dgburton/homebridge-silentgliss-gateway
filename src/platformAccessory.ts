@@ -48,6 +48,7 @@ export class SilentGlissBlindsAccessory {
     this.service.getCharacteristic(this.platform.Characteristic.TargetPosition)
       .on('set', this.setTargetPosition.bind(this));
     //this.updatePosition(accessory.context.blind.blindPosition);
+
 		this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, accessory.context.blind.blindPosition);
     this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, accessory.context.blind.blindPosition);
     this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);

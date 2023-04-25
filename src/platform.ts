@@ -170,31 +170,43 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 													const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 													if (existingAccessory) {
 														//this.log.debug('Restore cached blind:', blindName);
+
+														existingAccessory.context.blind = {
+															name: blindName,
+															id: blind.id,
+															blindPosition: Number(blind.pos_percent),
+															moveStatus: Number(blind.move_status),
+															model: motorInfo.model,
+															serialNumber: motorInfo.serial
+														};
+
 														new SilentGlissBlindsAccessory(this, existingAccessory);
+
 														this.api.updatePlatformAccessories([existingAccessory]);
+
 													} else {
 														// the accessory does not yet exist, so we need to create it
 
-														if (glue.mid === "31") {
-															this.log.info('Adding new blind:', blindName);
-												
-															// create a new accessory
-															const accessory = new this.api.platformAccessory(blindName, uuid);
+														//if (glue.mid === "31") {
+														this.log.info('Adding new blind:', blindName);
+											
+														// create a new accessory
+														const accessory = new this.api.platformAccessory(blindName, uuid);
 
-															//const homeKitBlindPosition = this.convertPosition(blindState.position);
-															accessory.context.blind = {
-																name: blindName,
-																id: blind.id,
-																blindPosition: Number(blind.pos_percent),
-																moveStatus: Number(blind.move_status),
-																model: motorInfo.model,
-																serialNumber: motorInfo.serial
-															};
-											
-															new SilentGlissBlindsAccessory(this, accessory);
-											
-															this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-														}
+														//const homeKitBlindPosition = this.convertPosition(blindState.position);
+														accessory.context.blind = {
+															name: blindName,
+															id: blind.id,
+															blindPosition: Number(blind.pos_percent),
+															moveStatus: Number(blind.move_status),
+															model: motorInfo.model,
+															serialNumber: motorInfo.serial
+														};
+										
+														new SilentGlissBlindsAccessory(this, accessory);
+										
+														this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+														//}
 
 													}
 
