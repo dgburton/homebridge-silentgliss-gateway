@@ -146,37 +146,14 @@ export class SilentGlissBlindsAccessory {
 
   setTargetPosition(value: CharacteristicValue, callback: CharacteristicSetCallback) {
     const targetPosition = value as number;
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, targetPosition);
 
-    this.platform.log.info(`${this.name} setTargetPosition to ${value}`);
+		this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, targetPosition);
 
-		let body = `command=[{"action":"moveto","mid":${this.accessory.context.blind.id},"position":"${value}"}]`;
-		
-    rp(
-			{
-        method: 'POST',
-        uri: `http://${this.platform.config.address}/command.jcf`,
-				headers: {
-					'Content-Type': 'text/plain',
-					'Content-Length': body.length
-				},
-        body: body,
-      }
-    )
-      .then((response) => {
+		this.platform.queueMoveTo(this.accessory.context.blind.id, targetPosition);
 
-				//console.log('response', response)
+		//this.platform.log.info(`${this.name} setTargetPosition to ${value}`);
 
-        // update current position
-        //this.updatePosition(targetPosition);
-        
-        //this.platform.log.info(`${this.name} currentPosition is now ${targetPosition}`);
-        callback(null);
-      })
-      .catch((err) => {
-        this.platform.log.error(`${this.name} setTargetPosition ERROR`, err.statusCode);
-        callback(null);
-      });
+		callback(null);
 
   }
 

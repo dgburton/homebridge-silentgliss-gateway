@@ -34,6 +34,8 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 	address!: string;
   updateStateTimeout?: NodeJS.Timeout;
 	uuidCallbacks!: object;
+	commandQueue: object[] = [];
+  flushCommandQueueTimeout?: NodeJS.Timeout;
   
   constructor(
     public readonly log: Logger,
@@ -240,6 +242,69 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 		if (this.uuidCallbacks) {
 			this.uuidCallbacks[uuid] = callback;
 		}
-	};
+	}
+
+	queueMoveTo(id, value) {
+
+		// clear the existing timeout
+		clearTimeout(this.flushCommandQueueTimeout);
+
+		// add this command to the queue
+		this.commandQueue.push(
+			{
+				command: 'moveto', 
+				id: id, 
+				value: value
+			});
+
+		this.flushCommandQueueTimeout = setTimeout(this.flushCommandQueue.bind(this), 250);
+
+	}
+
+	flushCommandQueue() {
+
+		let cmdQueue = JSON.parse(JSON.stringify(this.commandQueue));
+		this.commandQueue = [];
+
+		console.log("commandQueue: " + JSON.stringify(cmdQueue));
+
+		let body = '';
+		
+		for (let cmd of cmdQueue) {
+			if (cmd['command'] === 'moveto') {
+				body += `command=[{"action":"moveto","mid":${cmd['id']},"position":"${cmd['value']}"}]\r\n`;
+			}
+		}
+
+		if (body.length > 0) {
+			rp(
+				{
+					method: 'POST',
+					uri: `http://${this.config.address}/command.jcf`,
+					headers: {
+						'Content-Type': 'text/plain',
+						'Content-Length': body.length
+					},
+					body: body,
+				}
+			)
+				.then((response) => {
+
+					//console.log('response', response)
+
+					// update current position
+					//this.updatePosition(targetPosition);
+					
+					//this.platform.log.info(`${this.name} currentPosition is now ${targetPosition}`);
+				
+				})
+				.catch((err) => {
+					this.log.error(`flushCommandQueue ERROR`, err.statusCode);
+				});
+		}
+
+
+
+	}
 
 }
