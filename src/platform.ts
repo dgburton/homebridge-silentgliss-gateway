@@ -261,7 +261,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
 	}
 
-	flushCommandQueue() {
+	async flushCommandQueue() {
 
 		let cmdQueue = JSON.parse(JSON.stringify(this.commandQueue));
 		this.commandQueue = [];
@@ -277,7 +277,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 		}
 
 		if (body.length > 0) {
-			rp(
+			await rp(
 				{
 					method: 'POST',
 					uri: `http://${this.config.address}/command.jcf`,
