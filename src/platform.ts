@@ -277,6 +277,9 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 		}
 
 		if (body.length > 0) {
+
+			console.log('command', body)
+			
 			await rp(
 				{
 					method: 'POST',
@@ -290,7 +293,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 			)
 				.then((response) => {
 
-					//console.log('response', response)
+					
 
 					// update current position
 					//this.updatePosition(targetPosition);
