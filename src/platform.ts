@@ -273,7 +273,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 		for (let cmd of cmdQueue) {
 			if (cmd['command'] === 'moveto') {
 				// SilentGliss firmward v1.5.8 now expects a value between 0 and 1000 for the "position", instead of 0 to 100
-				body += `command=[{"action":"moveto","mid":${cmd['id']},"position":"${Number(cmd['value']) * 100}"}]\r\n`;
+				body += `command=[{"action":"moveto","mid":${cmd['id']},"position":"${Number(cmd['value']) * 10}"}]\r\n`;
 			}
 		}
 
