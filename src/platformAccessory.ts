@@ -74,17 +74,17 @@ export class SilentGlissBlindsAccessory {
 					this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
 					this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
 					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
-					this.platform.log.info(`${this.name} Move Status: STOPPED`);
+					this.platform.log.info(`${this.name} Move Status: STOPPED, Current Position: ${currentPosition}`);
 
 				} else if (moveStatus === 2) {
 					// blind going down
 					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
-					this.platform.log.info(`${this.name} Move Status: DECREASING`);
+					this.platform.log.info(`${this.name} Move Status: DECREASING, Current Position: ${currentPosition}`);
 
 				} else if (moveStatus === 1) {
 					// blind going up
 					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
-					this.platform.log.info(`${this.name} Move Status: INCREASING`);
+					this.platform.log.info(`${this.name} Move Status: INCREASING, Current Position: ${currentPosition}`);
 
 				}
 
@@ -94,8 +94,8 @@ export class SilentGlissBlindsAccessory {
 
 			if (currentPosition !== this._currentPosition) {
 				
-				this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
-				this._currentPosition = currentPosition;
+				//this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
+				//this._currentPosition = currentPosition;
 /*
 				this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
 				this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
