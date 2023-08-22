@@ -61,7 +61,7 @@ export class SilentGlissBlindsAccessory {
 
 		try {
 
-			//this.platform.log.info(`${this.name} ${JSON.stringify(value)} `);
+			this.platform.log.info(`${this.name} ${JSON.stringify(value)} `);
 
 			let currentPosition = Number(value.pos_percent);
 			let moveStatus = Number(value.move_status);
