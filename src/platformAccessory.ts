@@ -63,7 +63,7 @@ export class SilentGlissBlindsAccessory {
 
 			//this.platform.log.info(`${this.name} ${JSON.stringify(value)} `);
 
-			let currentPosition = parseInt((Number(value.pos_percent) / 10).toString());
+			let currentPosition = parseInt((Math.ceil(Number(value.pos_percent) / 10)).toString());
 			let moveStatus = Number(value.move_status);
 
 			//console.log("moveStatus", moveStatus);
