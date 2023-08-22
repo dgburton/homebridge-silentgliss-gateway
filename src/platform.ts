@@ -73,51 +73,59 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 		try {
 			rp(`http://${this.config.address}/motor_status.json`)
 			.then((response) => {
-	
-				const mstatus = JSON.parse(response).mstatus;
-	
-				const activeBlinds = mstatus.filter((blind: SilentGlissBlind) => blind.visible === '1');
-	
-				activeBlinds.forEach((blind) => {
-					const uuid = this.api.hap.uuid.generate(blind.id);
-					const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid)
-	
-					if (existingAccessory) {
-						//this.log.info('Found existing blind from state:', existingAccessory.displayName);
-	
-						//let func = this.uuidCallbacks[existingAccessory.UUID];
-	
-						//console.log("func", func);
-	
-						//console.log("this.uuidCallbacks",this.uuidCallbacks)
-	
-						if (this.uuidCallbacks[existingAccessory.UUID])
-							this.uuidCallbacks[existingAccessory.UUID](blind);
-	
-						//this.log.info(this.uuidCallbacks?[existingAccessory.UUID]);
-	
-						//existingAccessory.updatePosition(Number(blind.pos_percent) / 10);
-	
-					}
-				});
-	
-				/*if (this.config.verboseDebug) {
-	
-					console.log("mstatus", mstatus)
+
+				this.log.info('updateState.complete');
+
+				try {
+		
+					const mstatus = JSON.parse(response).mstatus;
+		
 					const activeBlinds = mstatus.filter((blind: SilentGlissBlind) => blind.visible === '1');
-					this.log.debug('updateState.activeBlinds', activeBlinds);
-	
-				}*/
-	
-				this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
+		
+					activeBlinds.forEach((blind) => {
+						const uuid = this.api.hap.uuid.generate(blind.id);
+						const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid)
+		
+						if (existingAccessory) {
+							//this.log.info('Found existing blind from state:', existingAccessory.displayName);
+		
+							//let func = this.uuidCallbacks[existingAccessory.UUID];
+		
+							//console.log("func", func);
+		
+							//console.log("this.uuidCallbacks",this.uuidCallbacks)
+		
+							if (this.uuidCallbacks[existingAccessory.UUID])
+								this.uuidCallbacks[existingAccessory.UUID](blind);
+		
+							//this.log.info(this.uuidCallbacks?[existingAccessory.UUID]);
+		
+							//existingAccessory.updatePosition(Number(blind.pos_percent) / 10);
+		
+						}
+					});
+		
+					/*if (this.config.verboseDebug) {
+		
+						console.log("mstatus", mstatus)
+						const activeBlinds = mstatus.filter((blind: SilentGlissBlind) => blind.visible === '1');
+						this.log.debug('updateState.activeBlinds', activeBlinds);
+		
+					}*/
+		
+					this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
+
+				} catch(errInner) {
+					this.log.error('updateState.innerError', errInner);
+				}
 	
 			}).catch((e) => {
-				this.log.error('updateState', e);
+				this.log.error('updateState.innerError', e);
 				this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
 	
 			});
 		} catch(err) {
-			console.log('updateState.err')
+			this.log.error('updateState.outerError', err);
 			if (this.updateStateTimeout) {
 				clearTimeout(this.updateStateTimeout);
 			}
