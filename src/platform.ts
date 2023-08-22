@@ -71,7 +71,10 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 		clearTimeout(this.updateStateTimeout);
 
 		try {
-			rp(`http://${this.config.address}/motor_status.json`)
+			rp({
+				uri: `http://${this.config.address}/motor_status.json`,
+				timeout: 5000
+			  })
 			.then((response) => {
 
 				this.log.info('updateState.complete');
