@@ -93,18 +93,9 @@ export class SilentGlissBlindsAccessory {
 				this._moveStatus = moveStatus;
 
 			} else if (currentPosition !== this._currentPosition) {
-				let homekitMoveStatus = this.platform.Characteristic.PositionState.STOPPED;
-				if (moveStatus === 2) {
-					homekitMoveStatus = this.platform.Characteristic.PositionState.DECREASING;
-				} else if (moveStatus === 1) {
-					homekitMoveStatus = this.platform.Characteristic.PositionState.INCREASING;
-				}
-				this.service.updateCharacteristic(this.platform.Characteristic.PositionState, homekitMoveStatus);
 				this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
-				this.platform.log.info(`${this.name} Move Status: NOT CHANGED BUT CURRENT POSITION CHANGED, Old Current Position ${this._currentPosition}, New Current Position: ${currentPosition}, Move Status: ${homekitMoveStatus}`);
+				this.platform.log.info(`${this.name} Move Status: NOT CHANGED BUT CURRENT POSITION CHANGED, Old Current Position ${this._currentPosition}, New Current Position: ${currentPosition}`);
 				this._currentPosition = currentPosition;
-
-				this._moveStatus = moveStatus;
 			}
 
 			if (currentPosition !== this._currentPosition) {
