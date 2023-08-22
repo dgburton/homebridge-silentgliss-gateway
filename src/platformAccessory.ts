@@ -93,9 +93,10 @@ export class SilentGlissBlindsAccessory {
 			}
 
 			if (currentPosition !== this._currentPosition) {
-				/*
+				
+				this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
 				this._currentPosition = currentPosition;
-
+/*
 				this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
 				this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
 				this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
