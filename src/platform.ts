@@ -124,7 +124,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 	
 			}).catch((e) => {
 				this.log.error('updateState.innerError', e);
-				this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
+				this.updateStateTimeout = setTimeout(this.updateState.bind(this), (STATE_REFRESH_INTERVAL_MS * 5));
 	
 			});
 		} catch(err) {
@@ -132,7 +132,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 			if (this.updateStateTimeout) {
 				clearTimeout(this.updateStateTimeout);
 			}
-			this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
+			this.updateStateTimeout = setTimeout(this.updateState.bind(this), (STATE_REFRESH_INTERVAL_MS * 5));
 		}
 
 
