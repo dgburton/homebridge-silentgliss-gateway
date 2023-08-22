@@ -90,10 +90,10 @@ export class SilentGlissBlindsAccessory {
 
 				this._moveStatus = moveStatus;
 
-			} else {
+			} else if (currentPosition !== this._currentPosition) {
 				this._currentPosition = currentPosition;
 				this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
-				this.platform.log.info(`${this.name} Move Status: NOT CHANGED, Current Position: ${currentPosition}`);
+				this.platform.log.info(`${this.name} Move Status: NOT CHANGED BUT CURRENT POSITION CHANGED, Old Current Position ${this._currentPosition}, New Current Position: ${currentPosition}`);
 			}
 
 			if (currentPosition !== this._currentPosition) {
