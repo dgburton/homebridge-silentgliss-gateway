@@ -63,7 +63,7 @@ export class SilentGlissBlindsAccessory {
 
 			//this.platform.log.info(`${this.name} ${JSON.stringify(value)} `);
 
-			let currentPosition = (Number(value.pos_percent) / 10);
+			let currentPosition = parseInt((Number(value.pos_percent) / 10).toString());
 			let moveStatus = Number(value.move_status);
 
 			//console.log("moveStatus", moveStatus);
@@ -92,6 +92,7 @@ export class SilentGlissBlindsAccessory {
 
 			} else if (currentPosition !== this._currentPosition) {
 				this._currentPosition = currentPosition;
+				this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
 				this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
 				this.platform.log.info(`${this.name} Move Status: NOT CHANGED BUT CURRENT POSITION CHANGED, Old Current Position ${this._currentPosition}, New Current Position: ${currentPosition}`);
 			}
