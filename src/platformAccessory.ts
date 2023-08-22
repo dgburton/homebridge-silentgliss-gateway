@@ -85,7 +85,7 @@ export class SilentGlissBlindsAccessory {
 				} else if (moveStatus === 1) {
 					// blind going up
 					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
-					this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, 1000);
+					this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, 100);
 					this.platform.log.info(`${this.name} Move Status: INCREASING, Current Position: ${currentPosition}`);
 
 				}
