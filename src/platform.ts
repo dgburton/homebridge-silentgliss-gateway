@@ -95,7 +95,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
 						//this.log.info(this.uuidCallbacks?[existingAccessory.UUID]);
 
-						//existingAccessory.updatePosition(Number(blind.pos_percent));
+						//existingAccessory.updatePosition(Number(blind.pos_percent) / 10);
 
 					}
 				});
@@ -176,7 +176,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 														existingAccessory.context.blind = {
 															name: blindName,
 															id: blind.id,
-															blindPosition: Number(blind.pos_percent),
+															blindPosition: (Number(blind.pos_percent) / 10),
 															moveStatus: Number(blind.move_status),
 															model: motorInfo.model,
 															serialNumber: motorInfo.serial
@@ -199,7 +199,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 														accessory.context.blind = {
 															name: blindName,
 															id: blind.id,
-															blindPosition: Number(blind.pos_percent),
+															blindPosition: (Number(blind.pos_percent) / 10),
 															moveStatus: Number(blind.move_status),
 															model: motorInfo.model,
 															serialNumber: motorInfo.serial
