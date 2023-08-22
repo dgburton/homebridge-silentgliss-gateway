@@ -2,7 +2,7 @@
 export const PLATFORM_NAME = 'SilentGlissGateway';
 export const PLUGIN_NAME = 'homebridge-silentgliss-gateway';
 
-export const STATE_REFRESH_INTERVAL_MS = 5000;
+export const STATE_REFRESH_INTERVAL_MS = 1000;
 
 /* MySmartBlinds App Settings */
 export const MYSMARTBLINDS_DOMAIN = 'mysmartblinds.auth0.com';
