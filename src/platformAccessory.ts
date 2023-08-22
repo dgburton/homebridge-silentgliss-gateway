@@ -78,20 +78,21 @@ export class SilentGlissBlindsAccessory {
 
 				} else if (moveStatus === 2) {
 					// blind going down
-					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
-					this.platform.log.info(`${this.name} Move Status: INCREASING, Current Position: ${currentPosition}`);
+					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
+					this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, 0);
+					this.platform.log.info(`${this.name} Move Status: DECREASING, Current Position: ${currentPosition}`);
 
 				} else if (moveStatus === 1) {
 					// blind going up
-					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
-					this.platform.log.info(`${this.name} Move Status: DECREASING, Current Position: ${currentPosition}`);
+					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
+					this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, 1000);
+					this.platform.log.info(`${this.name} Move Status: INCREASING, Current Position: ${currentPosition}`);
 
 				}
 
 				this._moveStatus = moveStatus;
 
 			} else if (currentPosition !== this._currentPosition) {
-				//this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
 				this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
 				this.platform.log.info(`${this.name} Move Status: NOT CHANGED BUT CURRENT POSITION CHANGED, Old Current Position ${this._currentPosition}, New Current Position: ${currentPosition}`);
 				this._currentPosition = currentPosition;
