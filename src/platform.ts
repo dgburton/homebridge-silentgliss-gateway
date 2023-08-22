@@ -185,7 +185,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 														existingAccessory.context.blind = {
 															name: blindName,
 															id: blind.id,
-															blindPosition: (Number(blind.pos_percent) / 10),
+															blindPosition: parseInt((Math.ceil(Number(blind.pos_percent) / 10)).toString()),
 															moveStatus: Number(blind.move_status),
 															model: motorInfo.model,
 															serialNumber: motorInfo.serial
@@ -208,7 +208,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 														accessory.context.blind = {
 															name: blindName,
 															id: blind.id,
-															blindPosition: (Number(blind.pos_percent) / 10),
+															blindPosition: parseInt((Math.ceil(Number(blind.pos_percent) / 10)).toString()),
 															moveStatus: Number(blind.move_status),
 															model: motorInfo.model,
 															serialNumber: motorInfo.serial
