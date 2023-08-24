@@ -71,8 +71,8 @@ export class SilentGlissBlindsAccessory {
 			if (moveStatus !== this._moveStatus) {
 				if (moveStatus === 4) {
 					// blind stopped
-					this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
-					this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
+					//this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
+					//this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
 					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
 					this.platform.log.info(`${this.name} Move Status: STOPPED, Current Position: ${currentPosition}`);
 
