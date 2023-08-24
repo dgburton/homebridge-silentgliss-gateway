@@ -18,15 +18,19 @@ export class SilentGlissBlindsAccessory {
   serialNumber: string;
   platform: SilentGlissGatewayPlatform;
   accessory: PlatformAccessory;
-  updateStoppedTargetStateTimeout?: NodeJS.Timeout;
+  homekitInitiatedMoveInProgress: boolean;
+  homekitInitiatedMoveInProgressStartTime: number;
+  homekitInitiatedMoveInProgressTimeout?: NodeJS.Timeout;
   verboseDebug: boolean;
-	_currentPosition: number;
-	_moveStatus: number;
+  _currentPosition: number;
+  _moveStatus: number;
 
   constructor(
     platform: SilentGlissGatewayPlatform,
     accessory: PlatformAccessory,
   ) {
+	this.homekitInitiatedMoveInProgress = false;
+	this.homekitInitiatedMoveInProgressStartTime = 0;
     this.platform = platform;
     this.name = accessory.context.blind.name;
     this.model = accessory.context.blind.model;
@@ -62,84 +66,64 @@ export class SilentGlissBlindsAccessory {
 
 		try {
 
-			//this.platform.log.info(`${this.name} ${JSON.stringify(value)} `);
-
 			let currentPosition = parseInt((Math.ceil(Number(value.pos_percent) / 10)).toString());
 			let moveStatus = Number(value.move_status);
 
-			//console.log("moveStatus", moveStatus);
+			if ( (moveStatus === 4) && (this.homekitInitiatedMoveInProgress === true) ) {
 
-			if (moveStatus !== this._moveStatus) {
-				if (moveStatus === 4) {
-					// blind stopped
-					//this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
-					//this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
-					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
-					this.platform.log.info(`${this.name} Move Status: STOPPED, Current Position: ${currentPosition}`);
+				let delta = (new Date().getTime() - this.homekitInitiatedMoveInProgressStartTime);
 
-				} else if (moveStatus === 2) {
-					// blind going down
-					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
-					//this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, 0);
-					this.platform.log.info(`${this.name} Move Status: DECREASING, Current Position: ${currentPosition}`);
+				if (delta > 3000) {
 
-				} else if (moveStatus === 1) {
-					// blind going up
-					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
-					//this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, 100);
-					this.platform.log.info(`${this.name} Move Status: INCREASING, Current Position: ${currentPosition}`);
-
+					this.homekitInitiatedMoveInProgress = false;	
+					this.platform.log.info(`${this.name} Homekit initiated move timeout ENDED BECAUSE RECEIVED 'STOPPED' FROM SG GATEWAY`);
+					clearTimeout(this.homekitInitiatedMoveInProgressTimeout);
+				} else {
+					this.platform.log.info(`${this.name} Homekit initiated move timeout ENDED BECAUSE RECEIVED 'STOPPED' FROM SG GATEWAY ** BUT ** IGNORED AS IS WITHIN 3s DELTA`);
 				}
-
-				this._moveStatus = moveStatus;
-
-			} else if (currentPosition !== this._currentPosition) {
-				this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
-				this.platform.log.info(`${this.name} Move Status: NOT CHANGED BUT CURRENT POSITION CHANGED, Old Current Position ${this._currentPosition}, New Current Position: ${currentPosition}`);
-				this._currentPosition = currentPosition;
 			}
 
-			if (currentPosition !== this._currentPosition) {
-
-				/*				
-				this._currentPosition = currentPosition;
-
-				this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
-				this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
-				this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
-
-				if (this.verboseDebug) {
-					this.platform.log.info(`Status Update: ${this.name} Current Position : ${currentPosition}%`);
-				}
-				*/
-
-
-				/*
-
-
-				if (currentPosition > this._currentPosition) {
-					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
-					if (this.verboseDebug) {
-						this.platform.log.info(`Status Update: ${this.name} Position State : DECREASING`);
-					}
-					
-				} else if (currentPosition < this._currentPosition) {
-					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
-					if (this.verboseDebug) {
-						this.platform.log.info(`Status Update: ${this.name} Position State : INCREASING`);
-					}
-
-				} else {
-					this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
-					if (this.verboseDebug) {
-						this.platform.log.info(`Status Update: ${this.name} Position State : STOPPED`);
-					}
-
-				}
-				*/
+			if (this.homekitInitiatedMoveInProgress) {
+				this.platform.log.info(`${this.name} State update skipped as homekitInitiatedMoveInProgress=true`);
 
 			} else {
-				//this.platform.log.info(`_currentPosition: ${this._currentPosition} equals currentPosition : ${currentPosition}%`);
+
+				//this.platform.log.info(`${this.name} ${JSON.stringify(value)} `);
+
+
+
+				//console.log("moveStatus", moveStatus);
+
+				if (moveStatus !== this._moveStatus) {
+					if (moveStatus === 4) {
+						// blind stopped
+						this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, currentPosition);
+						this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
+						this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
+						this.platform.log.info(`${this.name} Move Status: STOPPED, Current Position: ${currentPosition}`);
+
+					} else if (moveStatus === 2) {
+						// blind going down
+						this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
+						this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, 0);
+						this.platform.log.info(`${this.name} Move Status: DECREASING, Current Position: ${currentPosition}`);
+
+					} else if (moveStatus === 1) {
+						// blind going up
+						this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
+						this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, 100);
+						this.platform.log.info(`${this.name} Move Status: INCREASING, Current Position: ${currentPosition}`);
+
+					}
+
+					this._moveStatus = moveStatus;
+
+				} else if (currentPosition !== this._currentPosition) {
+					this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, currentPosition);
+					this.platform.log.info(`${this.name} Move Status: NOT CHANGED BUT CURRENT POSITION CHANGED, Old Current Position ${this._currentPosition}, New Current Position: ${currentPosition}`);
+					this._currentPosition = currentPosition;
+				}
+
 			}
 
 
@@ -151,27 +135,44 @@ export class SilentGlissBlindsAccessory {
 
 	}
 
+	setHomekitInitiatedMoveInProgressFalse() {
+
+		this.homekitInitiatedMoveInProgress = false;
+		this.homekitInitiatedMoveInProgressStartTime = new Date().getTime();
+		this.platform.log.info(`${this.name} Homekit initiated move timeout ENDED`);
+
+		clearTimeout(this.homekitInitiatedMoveInProgressTimeout);
+	}
 
   setTargetPosition(value: CharacteristicValue, callback: CharacteristicSetCallback) {
     const targetPosition = value as number;
 
-		this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, targetPosition);
+	// pause state updates for the duration of this move
+	this.homekitInitiatedMoveInProgress = true;
+	if (this.homekitInitiatedMoveInProgressTimeout) {
+		clearTimeout(this.homekitInitiatedMoveInProgressTimeout);
+  	}
+	this.homekitInitiatedMoveInProgressTimeout = setTimeout(this.setHomekitInitiatedMoveInProgressFalse.bind(this), 10000);
 
-		if (targetPosition < this._currentPosition) {
-			this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
-			this._moveStatus = 2;
-			this.platform.log.info(`${this.name} Move Status via Homekit: DECREASING`);
-		} else if (targetPosition > this._currentPosition) {
-			this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
-			this._moveStatus = 1;
-			this.platform.log.info(`${this.name} Move Status via Homekit: INCREASING`);
-		}
+	this.platform.log.info(`${this.name} Homekit initiated move timeout STARTED`);
 
-		this.platform.queueMoveTo(this.accessory.context.blind.id, targetPosition);
+	this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, targetPosition);
 
-		//this.platform.log.info(`${this.name} setTargetPosition to ${value}`);
+	if (targetPosition < this._currentPosition) {
+		this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
+		this._moveStatus = 2;
+		this.platform.log.info(`${this.name} Move Status via Homekit: DECREASING`);
+	} else if (targetPosition > this._currentPosition) {
+		this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
+		this._moveStatus = 1;
+		this.platform.log.info(`${this.name} Move Status via Homekit: INCREASING`);
+	}
 
-		callback(null);
+	this.platform.queueMoveTo(this.accessory.context.blind.id, targetPosition);
+
+	//this.platform.log.info(`${this.name} setTargetPosition to ${value}`);
+
+	callback(null);
 
   }
 
