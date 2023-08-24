@@ -76,10 +76,10 @@ export class SilentGlissBlindsAccessory {
 				if (delta > 3000) {
 
 					this.homekitInitiatedMoveInProgress = false;	
-					this.platform.log.info(`${this.name} Homekit initiated move timeout ENDED BECAUSE RECEIVED 'STOPPED' FROM SG GATEWAY`);
+					this.platform.log.info(`${this.name} Homekit initiated move timeout ENDED BECAUSE RECEIVED 'STOPPED' FROM SG GATEWAY. Delta ${delta}`);
 					clearTimeout(this.homekitInitiatedMoveInProgressTimeout);
 				} else {
-					this.platform.log.info(`${this.name} Homekit initiated move timeout ENDED BECAUSE RECEIVED 'STOPPED' FROM SG GATEWAY ** BUT ** IGNORED AS IS WITHIN 3s DELTA`);
+					this.platform.log.info(`${this.name} Homekit initiated move timeout ENDED BECAUSE RECEIVED 'STOPPED' FROM SG GATEWAY ** BUT ** IGNORED AS IS WITHIN 3s DELTA. Delta ${delta}`);
 				}
 			}
 
@@ -138,7 +138,6 @@ export class SilentGlissBlindsAccessory {
 	setHomekitInitiatedMoveInProgressFalse() {
 
 		this.homekitInitiatedMoveInProgress = false;
-		this.homekitInitiatedMoveInProgressStartTime = new Date().getTime();
 		this.platform.log.info(`${this.name} Homekit initiated move timeout ENDED`);
 
 		clearTimeout(this.homekitInitiatedMoveInProgressTimeout);
@@ -149,6 +148,7 @@ export class SilentGlissBlindsAccessory {
 
 	// pause state updates for the duration of this move
 	this.homekitInitiatedMoveInProgress = true;
+	this.homekitInitiatedMoveInProgressStartTime = new Date().getTime();
 	if (this.homekitInitiatedMoveInProgressTimeout) {
 		clearTimeout(this.homekitInitiatedMoveInProgressTimeout);
   	}
