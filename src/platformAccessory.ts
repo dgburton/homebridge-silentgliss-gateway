@@ -152,7 +152,7 @@ export class SilentGlissBlindsAccessory {
 	if (this.homekitInitiatedMoveInProgressTimeout) {
 		clearTimeout(this.homekitInitiatedMoveInProgressTimeout);
   	}
-	this.homekitInitiatedMoveInProgressTimeout = setTimeout(this.setHomekitInitiatedMoveInProgressFalse.bind(this), 10000);
+	this.homekitInitiatedMoveInProgressTimeout = setTimeout(this.setHomekitInitiatedMoveInProgressFalse.bind(this), 25000);
 
 	this.platform.log.info(`${this.name} Homekit initiated move timeout STARTED`);
 
