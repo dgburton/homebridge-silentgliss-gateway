@@ -152,7 +152,7 @@ export class SilentGlissBlindsAccessory {
 	if (this.homekitInitiatedMoveInProgressTimeout) {
 		clearTimeout(this.homekitInitiatedMoveInProgressTimeout);
   	}
-	this.homekitInitiatedMoveInProgressTimeout = setTimeout(this.setHomekitInitiatedMoveInProgressFalse.bind(this), 25000);
+	this.homekitInitiatedMoveInProgressTimeout = setTimeout(this.setHomekitInitiatedMoveInProgressFalse.bind(this), 25000); // maximum travel-time is 17 seconds, so use 25 for some margin. Biggest blind is the Landing
 
 	this.platform.log.info(`${this.name} Homekit initiated move timeout STARTED`);
 
