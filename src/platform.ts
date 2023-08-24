@@ -66,7 +66,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 	
   updateState() {
 
-		this.log.info('updateState.start');
+		//this.log.info('updateState.start');
 
 		clearTimeout(this.updateStateTimeout);
 
@@ -77,7 +77,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 			  })
 			.then((response) => {
 
-				this.log.info('updateState.complete');
+				//this.log.info('updateState.complete');
 
 				try {
 		
