@@ -18,6 +18,7 @@ export class SilentGlissBlindsAccessory {
   serialNumber: string;
   platform: SilentGlissGatewayPlatform;
   accessory: PlatformAccessory;
+  updateStoppedTargetStateTimeout?: NodeJS.Timeout;
   verboseDebug: boolean;
 	_currentPosition: number;
 	_moveStatus: number;
@@ -155,6 +156,16 @@ export class SilentGlissBlindsAccessory {
     const targetPosition = value as number;
 
 		this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, targetPosition);
+
+		if (targetPosition < this._currentPosition) {
+			this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.DECREASING);
+			this._moveStatus = 2;
+			this.platform.log.info(`${this.name} Move Status via Homekit: DECREASING`);
+		} else if (targetPosition > this._currentPosition) {
+			this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.INCREASING);
+			this._moveStatus = 1;
+			this.platform.log.info(`${this.name} Move Status via Homekit: INCREASING`);
+		}
 
 		this.platform.queueMoveTo(this.accessory.context.blind.id, targetPosition);
 
