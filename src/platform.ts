@@ -59,12 +59,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
     this.api.on('didFinishLaunching', () => {
       this.log.debug('Executed didFinishLaunching callback');
-      if (ADD_ACCESSORIES) {
-        this.log.debug('ADD_ACCESSORIES=true so running discoverDevices...');
-        this.discoverDevices();
-      } else {
-        this.log.debug('ADD_ACCESSORIES=false so skipping discoverDevices...');
-      }
+      this.discoverDevices();
 
 			this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
 
@@ -199,7 +194,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
 													const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 													if (existingAccessory) {
-														//this.log.debug('Restore cached blind:', blindName);
+														this.log.debug('Restore cached blind:', blindName);
 
 														existingAccessory.context.blind = {
 															name: blindName,
