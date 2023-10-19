@@ -27,6 +27,8 @@ import {
 } from './config';
 import { SilentGlissBlindsAccessory } from './platformAccessory';
 
+const ADD_ACCESSORIES = false;
+
 export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
@@ -57,7 +59,12 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
     this.api.on('didFinishLaunching', () => {
       this.log.debug('Executed didFinishLaunching callback');
-      this.discoverDevices();
+      if (ADD_ACCESSORIES) {
+        this.log.debug('ADD_ACCESSORIES=true so running discoverDevices...');
+        this.discoverDevices();
+      } else {
+        this.log.debug('ADD_ACCESSORIES=false so skipping discoverDevices...');
+      }
 
 			this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
 
