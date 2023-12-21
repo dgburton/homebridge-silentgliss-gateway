@@ -148,6 +148,25 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
   discoverDevices() {
 
+		/*
+		// 155654433221 <-- code to remove a blind with this serial number (in the case of a motor being replaced)
+		for (let i = 0; i < 100; i++) {
+
+			const uuidToRemove = this.api.hap.uuid.generate(`${i}`);
+			const existingAccessoryToRemove = this.accessories.find(accessory => accessory.UUID === uuidToRemove);
+			if (existingAccessoryToRemove) {
+				if (existingAccessoryToRemove.context.blind.serialNumber === "155654433221") {
+					console.error("****** REMOVE THIS BLIND: " + JSON.stringify(existingAccessoryToRemove.context.blind));
+					this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessoryToRemove]);
+				}
+			} else {
+				//console.error("REMOVE THIS BLIND: existingAccessoryToRemove not found with UUID: " + uuidToRemove);
+			}
+
+		}
+		*/
+
+
 		rp(`http://${this.config.address}/room.json`)
 			.then((response) => {
 				const rooms = JSON.parse(response).room;
