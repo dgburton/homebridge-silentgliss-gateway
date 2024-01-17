@@ -198,17 +198,19 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 													const glue = glues.find((g: { mid: string }) => g.mid === blind.id);
 													const location = locations.find((l: { id: string }) => l.id === glue.lid);
 													const motorInfo = mfixed.find((mi: { id: string }) => mi.id === blind.id);
+													const room = rooms.find((g: { id: string }) => g.id === location.rid);
 
 													if (this.config.verboseDebug) {
-														//console.log("blind", blind);
-														//console.log("motorInfo", motorInfo);
-														//console.log("glue", glue);
-														//console.log("location", location);
+														console.log("blind", blind);
+														console.log("motorInfo", motorInfo);
+														console.log("glue", glue);
+														console.log("location", location);
+														console.log("room", room);
 													}
 
-													const blindName = `${location.name}`;
+													const blindName = `${room.name} ${location.name}`;
 													if (this.config.verboseDebug) {
-														//console.log(`${uuid} - ${blind.id} - ${blindName}`);
+														console.log(`${uuid} - ${blind.id} - ${blindName}`);
 													}
 
 													const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
