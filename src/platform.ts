@@ -188,7 +188,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
 												if (this.config.verboseDebug) {
 													//this.log.debug('activeBlinds', activeBlinds);
-													//this.log.debug('deletedBlinds', deletedBlinds);
+													this.log.debug('deletedBlinds', deletedBlinds);
 												}
 
 												activeBlinds.forEach((blind: SilentGlissBlind) => {
@@ -261,19 +261,17 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
 												/*
 												deletedBlinds.forEach((blind) => {
-													const uuid = this.api.hap.uuid.generate(blind.encodedMacAddress);
+													const uuid = this.api.hap.uuid.generate(blind.id);
 													const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-													const inActive = activeBlinds.findIndex(
-														(activeBlind: SilentGlissBlind) => blind.encodedMacAddress === activeBlind.encodedMacAddress,
-													) > -1;
 
-													if (existingAccessory && !inActive) {
+													if (existingAccessory) {
 														this.accessories.splice(this.accessories.findIndex(acc => acc.UUID === existingAccessory.UUID), 1);
 														this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
 														this.log.info('Deleted blind from cache:', existingAccessory.displayName);
 													}
 												});
 												*/
+												
 											
 											});
 									});
