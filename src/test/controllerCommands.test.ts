@@ -54,10 +54,10 @@ test('falls back to individual actions inside one controller command array', () 
 
 test('uses native groups for physical open, close, and stop commands', () => {
   assert.deepEqual(planDiscreteControllerActions(['1', '2'], 'open', groups, metadata).actions, [
-    { action: 'open', gid: 1 },
+    { action: 'moveto', position: '1000', gid: 1 },
   ]);
   assert.deepEqual(planDiscreteControllerActions(['1', '2'], 'close', groups, metadata).actions, [
-    { action: 'close', gid: 1 },
+    { action: 'moveto', position: '0', gid: 1 },
   ]);
   assert.deepEqual(planDiscreteControllerActions(['1', '2'], 'stop', groups, metadata).actions, [
     { action: 'stop', gid: 1 },
@@ -67,8 +67,8 @@ test('uses native groups for physical open, close, and stop commands', () => {
 test('splits a controller-spanning local subset into the best group plus remaining motors', () => {
   const plan = planDiscreteControllerActions(['1', '2', '3'], 'close', [groups[0]], metadata);
   assert.deepEqual(plan.actions, [
-    { action: 'close', gid: 1 },
-    { action: 'close', mid: 3 },
+    { action: 'moveto', position: '0', gid: 1 },
+    { action: 'moveto', position: '0', mid: 3 },
   ]);
   assert.deepEqual(plan.groupIds, [1]);
   assert.deepEqual(plan.motorIds, ['3']);

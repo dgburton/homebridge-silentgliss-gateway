@@ -178,7 +178,7 @@ export function planDiscreteControllerActions(
       continue;
     }
 
-    actions.push({ action, gid: group.id });
+    actions.push(discreteControllerAction(action, { gid: group.id }));
     usedGroupIds.push(group.id);
     for (const motorId of groupMotorIds) {
       remainingMotorIds.delete(motorId);
@@ -187,10 +187,24 @@ export function planDiscreteControllerActions(
 
   const usedMotorIds = Array.from(remainingMotorIds);
   for (const motorId of usedMotorIds) {
-    actions.push({ action, mid: Number(motorId) });
+    actions.push(discreteControllerAction(action, { mid: Number(motorId) }));
   }
 
   return { actions, groupIds: usedGroupIds, motorIds: usedMotorIds };
+}
+
+function discreteControllerAction(
+  action: DiscreteControllerAction,
+  target: { mid?: number; gid?: number },
+): ControllerAction {
+  if (action === 'stop') {
+    return { action: 'stop', ...target };
+  }
+  return {
+    action: 'moveto',
+    position: action === 'open' ? '1000' : '0',
+    ...target,
+  };
 }
 
 export function motorIdsForGroup(
