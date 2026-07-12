@@ -1,5 +1,4 @@
 import rp from 'request-promise';
-import jwt from 'jsonwebtoken';
 import {
   API,
   DynamicPlatformPlugin,
@@ -10,40 +9,52 @@ import {
   Characteristic,
 } from 'homebridge';
 import {
-  get,
-} from 'lodash';
-import {
   PLATFORM_NAME,
   PLUGIN_NAME,
   STATE_REFRESH_INTERVAL_MS,
-  MYSMARTBLINDS_OPTIONS,
-  MYSMARTBLINDS_HEADERS,
-  MYSMARTBLINDS_GRAPHQL,
-  MYSMARTBLINDS_QUERIES,
 } from './settings';
 import {
   SilentGlissConfig,
   SilentGlissBlind,
 } from './config';
 import { SilentGlissBlindsAccessory } from './platformAccessory';
-
-const ADD_ACCESSORIES = false;
+import { CommandBatcher, MoveRequest } from './commandBatcher';
+import {
+  canonicalKind,
+  collectGroupCandidates,
+  ControllerAction,
+  groupSignature,
+  managedGroupName,
+  MotorMetadata,
+  NativeGroup,
+  planControllerActions,
+} from './controllerCommands';
 
 export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
   public readonly accessories: PlatformAccessory[] = [];
-	address!: string;
+  address!: string;
   updateStateTimeout?: NodeJS.Timeout;
-	uuidCallbacks!: object;
-	commandQueue: object[] = [];
-  flushCommandQueueTimeout?: NodeJS.Timeout;
+  uuidCallbacks!: Record<string, (value: SilentGlissBlind) => void>;
+  private readonly commandBatcher: CommandBatcher;
+  private readonly motorMetadata = new Map<string, MotorMetadata>();
+  private nativeGroups: NativeGroup[] = [];
+  private readonly groupCandidateCounts = new Map<string, number>();
+  private lastStateErrorLogAt = 0;
   
   constructor(
     public readonly log: Logger,
     public readonly config: PlatformConfig & SilentGlissConfig,
     public readonly api: API,
   ) {
+    this.commandBatcher = new CommandBatcher(this.flushMoveRequests.bind(this), {
+      onError: (error, requests) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.log.error(`Failed to send ${requests.length} Silent Gliss move request(s): ${message}`);
+      },
+    });
+
     /* plugin not configured check */
     if (!config) {
       this.log.info('No configuration found for platform ', PLATFORM_NAME);
@@ -51,7 +62,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
     }
 
     /* setup config */
-		this.uuidCallbacks = {};
+    this.uuidCallbacks = {};
     this.config = config;
     this.log = log;
 
@@ -60,10 +71,13 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       this.log.debug('Executed didFinishLaunching callback');
       this.discoverDevices();
+      void this.refreshNativeGroups();
 
-			this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
+      this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
 
     });
+
+    this.api.on('shutdown', () => this.commandBatcher.dispose());
   }
 	
   updateState() {
@@ -76,7 +90,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 			rp({
 				uri: `http://${this.config.address}/motor_status.json`,
 				timeout: 5000
-			  })
+				})
 			.then((response) => {
 
 				//this.log.info('updateState.complete');
@@ -121,16 +135,17 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 					this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
 
 				} catch(errInner) {
-					this.log.error('updateState.innerError', errInner);
+					this.logStateRefreshError(errInner);
+					this.updateStateTimeout = setTimeout(this.updateState.bind(this), (STATE_REFRESH_INTERVAL_MS * 5));
 				}
 	
 			}).catch((e) => {
-				this.log.error('updateState.innerError', e);
+				this.logStateRefreshError(e);
 				this.updateStateTimeout = setTimeout(this.updateState.bind(this), (STATE_REFRESH_INTERVAL_MS * 5));
 	
 			});
 		} catch(err) {
-			this.log.error('updateState.outerError', err);
+			this.logStateRefreshError(err);
 			if (this.updateStateTimeout) {
 				clearTimeout(this.updateStateTimeout);
 			}
@@ -139,6 +154,17 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
 
 		
+  }
+
+  private logStateRefreshError(error: unknown): void {
+    const now = Date.now();
+    if (now - this.lastStateErrorLogAt < 30000) {
+      return;
+    }
+
+    this.lastStateErrorLogAt = now;
+    const message = error instanceof Error ? error.message : String(error);
+    this.log.warn(`Silent Gliss state refresh failed; retrying: ${message}`);
   }
 
   configureAccessory(accessory: PlatformAccessory) {
@@ -209,6 +235,12 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 													}
 
 													const blindName = `${room.name} ${location.name}`;
+													this.motorMetadata.set(blind.id, {
+														motorId: blind.id,
+														locationId: Number(location.id),
+														room: room.name,
+														kind: canonicalKind(location.name),
+													});
 													if (this.config.verboseDebug) {
 														console.log(`${uuid} - ${blind.id} - ${blindName}`);
 													}
@@ -286,71 +318,129 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 		}
 	}
 
-	queueMoveTo(id, value) {
+  queueMoveTo(id: string, value: number, requiresMove = true): void {
+    this.commandBatcher.queue({
+      motorId: String(id),
+      targetPosition: Number(value),
+      requiresMove,
+    });
+  }
 
-		// clear the existing timeout
-		clearTimeout(this.flushCommandQueueTimeout);
+  private async flushMoveRequests(requests: MoveRequest[]): Promise<void> {
+    const plan = planControllerActions(requests, this.nativeGroups, this.motorMetadata);
 
-		// add this command to the queue
-		this.commandQueue.push(
-			{
-				command: 'moveto', 
-				id: id, 
-				value: value
-			});
+    if (plan.actions.length > 0) {
+      await this.sendControllerActions(plan.actions);
+      this.log.debug(
+        `Sent ${requests.length} covering request(s) as ${plan.actions.length} controller action(s) ` +
+        `using ${plan.groupIds.length} native group(s)`,
+      );
+    }
 
-		this.flushCommandQueueTimeout = setTimeout(this.flushCommandQueue.bind(this), 250);
+    if (this.config.autoGroups !== false) {
+      try {
+        await this.learnNativeGroups(requests);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.log.warn(`Could not learn Silent Gliss groups: ${message}`);
+      }
+    }
+  }
 
-	}
+  private async sendControllerActions(actions: ControllerAction[]): Promise<void> {
+    const body = `command=${JSON.stringify(actions)}\r\n`;
+    await rp({
+      method: 'POST',
+      uri: `http://${this.config.address}/command.jcf`,
+      headers: {
+        'Content-Type': 'text/plain',
+        'Content-Length': body.length,
+      },
+      body,
+      timeout: 5000,
+    });
+  }
 
-	async flushCommandQueue() {
+  private async refreshNativeGroups(): Promise<void> {
+    if (!this.config.address) {
+      return;
+    }
 
-		let cmdQueue = JSON.parse(JSON.stringify(this.commandQueue));
-		this.commandQueue = [];
+    try {
+      const response = await rp({
+        uri: `http://${this.config.address}/group.json`,
+        timeout: 5000,
+      });
+      const parsed = JSON.parse(response).group ?? [];
+      this.nativeGroups = parsed.map((group: { id: string; name: string; lid: number[] }) => ({
+        id: Number(group.id),
+        name: group.name,
+        locationIds: group.lid.map(Number),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log.warn(`Could not refresh Silent Gliss groups: ${message}`);
+    }
+  }
 
-		console.log("commandQueue: " + JSON.stringify(cmdQueue));
+  private async learnNativeGroups(requests: MoveRequest[]): Promise<void> {
+    const candidates = collectGroupCandidates(requests, this.motorMetadata);
 
-		let body = '';
-		
-		for (let cmd of cmdQueue) {
-			if (cmd['command'] === 'moveto') {
-				// SilentGliss firmward v1.5.8 now expects a value between 0 and 1000 for the "position", instead of 0 to 100
-				body += `command=[{"action":"moveto","mid":${cmd['id']},"position":"${Number(cmd['value']) * 10}"}]\r\n`;
-			}
-		}
+    for (const candidate of candidates) {
+      const alreadyExists = this.nativeGroups.some(group =>
+        groupSignature(group.locationIds) === candidate.signature,
+      );
+      if (alreadyExists) {
+        this.groupCandidateCounts.delete(candidate.signature);
+        continue;
+      }
 
-		if (body.length > 0) {
+      const observationCount = (this.groupCandidateCounts.get(candidate.signature) ?? 0) + 1;
+      this.groupCandidateCounts.set(candidate.signature, observationCount);
+      if (observationCount < candidate.threshold) {
+        continue;
+      }
 
-			console.log('command', body)
-			
-			await rp(
-				{
-					method: 'POST',
-					uri: `http://${this.config.address}/command.jcf`,
-					headers: {
-						'Content-Type': 'text/plain',
-						'Content-Length': body.length
-					},
-					body: body,
-				}
-			)
-				.then((response) => {
+      if (this.nativeGroups.length >= 64) {
+        this.log.warn('Silent Gliss group capacity reached; continuing with multi-motor command arrays');
+        return;
+      }
 
-					
+      const usedIds = new Set(this.nativeGroups.map(group => group.id));
+      let groupId = 1;
+      while (usedIds.has(groupId) && groupId <= 64) {
+        groupId++;
+      }
+      if (groupId > 64) {
+        return;
+      }
 
-					// update current position
-					//this.updatePosition(targetPosition);
-					
-					//this.platform.log.info(`${this.name} currentPosition is now ${targetPosition}`);
-				
-				})
-				.catch((err) => {
-					this.log.error(`flushCommandQueue ERROR`, err.statusCode);
-				});
-		}
+      const name = managedGroupName(candidate);
+      const payload = [{ id: groupId, name, lid: candidate.locationIds }];
+      const body = `group=${JSON.stringify(payload)}`;
+      await rp({
+        method: 'POST',
+        uri: `http://${this.config.address}/command.jcf`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': body.length,
+        },
+        body,
+        timeout: 5000,
+      });
 
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await this.refreshNativeGroups();
+      const created = this.nativeGroups.some(group =>
+        group.id === groupId && groupSignature(group.locationIds) === candidate.signature,
+      );
+      if (!created) {
+        throw new Error(`controller did not persist group ${groupId}`);
+      }
 
-
-	}
+      this.groupCandidateCounts.delete(candidate.signature);
+      this.log.info(`Created managed Silent Gliss group ${name} with ${candidate.locationIds.length} covering(s)`);
+    }
+  }
 
 }
