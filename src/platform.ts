@@ -342,10 +342,23 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
 
     if (plan.actions.length > 0) {
       await this.sendControllerActions(plan.actions);
-      this.log.debug(
-        `Sent ${requests.length} covering request(s) as ${plan.actions.length} controller action(s) ` +
-        `using ${plan.groupIds.length} native group(s)`,
+      const groupActions = plan.actions.filter(
+        (action): action is ControllerAction & { gid: number } => action.gid !== undefined,
       );
+      if (groupActions.length > 0) {
+        const summary = groupActions.map(action => {
+          const group = this.nativeGroups.find(item => item.id === action.gid);
+          return `${group?.name ?? 'group'} (#${action.gid}) -> ${Number(action.position) / 10}%`;
+        }).join(', ');
+        this.log.info(
+          `Controller ${this.config.address} accepted native group move: ${summary} ` +
+          `(${requests.length} HomeKit covering request(s))`,
+        );
+      } else {
+        this.log.debug(
+          `Sent ${requests.length} covering request(s) as ${plan.actions.length} controller action(s)`,
+        );
+      }
     }
 
     if (this.config.autoGroups !== false) {
