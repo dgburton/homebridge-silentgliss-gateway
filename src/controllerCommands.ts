@@ -23,8 +23,8 @@ export interface NativeGroupConfiguration {
 }
 
 export interface ControllerAction {
-  action: 'moveto';
-  position: string;
+  action: 'moveto' | 'open' | 'close' | 'stop';
+  position?: string;
   mid?: number;
   gid?: number;
 }
@@ -41,6 +41,8 @@ export interface GroupCandidate {
   label: string;
   threshold: number;
 }
+
+export type DiscreteControllerAction = 'open' | 'close' | 'stop';
 
 function sortedUnique(values: number[]): number[] {
   return Array.from(new Set(values)).sort((a, b) => a - b);
@@ -148,6 +150,79 @@ export function planControllerActions(
   }
 
   return { actions, groupIds: usedGroupIds, motorIds: usedMotorIds };
+}
+
+export function planDiscreteControllerActions(
+  motorIds: string[],
+  action: DiscreteControllerAction,
+  nativeGroups: NativeGroup[],
+  metadata: ReadonlyMap<string, MotorMetadata>,
+): CommandPlan {
+  const actions: ControllerAction[] = [];
+  const usedGroupIds: number[] = [];
+  const requestedMotorIds = new Set(motorIds.map(String));
+  const remainingMotorIds = new Set(requestedMotorIds);
+
+  const eligibleGroups = nativeGroups
+    .map(group => ({
+      group,
+      motorIds: motorIdsForGroup(group, metadata),
+    }))
+    .filter(({ group, motorIds: groupMotorIds }) => groupMotorIds.length === group.locationIds.length)
+    .filter(({ motorIds: groupMotorIds }) => groupMotorIds.length >= 2)
+    .filter(({ motorIds: groupMotorIds }) => groupMotorIds.every(motorId => requestedMotorIds.has(motorId)))
+    .sort((a, b) => b.motorIds.length - a.motorIds.length);
+
+  for (const { group, motorIds: groupMotorIds } of eligibleGroups) {
+    if (!groupMotorIds.every(motorId => remainingMotorIds.has(motorId))) {
+      continue;
+    }
+
+    actions.push({ action, gid: group.id });
+    usedGroupIds.push(group.id);
+    for (const motorId of groupMotorIds) {
+      remainingMotorIds.delete(motorId);
+    }
+  }
+
+  const usedMotorIds = Array.from(remainingMotorIds);
+  for (const motorId of usedMotorIds) {
+    actions.push({ action, mid: Number(motorId) });
+  }
+
+  return { actions, groupIds: usedGroupIds, motorIds: usedMotorIds };
+}
+
+export function motorIdsForGroup(
+  group: NativeGroup,
+  metadata: ReadonlyMap<string, MotorMetadata>,
+): string[] {
+  const metadataItems = Array.from(metadata.values());
+  return group.locationIds
+    .map(locationId => metadataItems.find(item => item.locationId === locationId)?.motorId)
+    .filter((motorId): motorId is string => motorId !== undefined);
+}
+
+export function explicitGroupCandidate(
+  motorIds: string[],
+  label: string,
+  metadata: ReadonlyMap<string, MotorMetadata>,
+): GroupCandidate | undefined {
+  const items = motorIds
+    .map(motorId => metadata.get(String(motorId)))
+    .filter((item): item is MotorMetadata => item !== undefined);
+
+  if (items.length < 2 || items.length !== new Set(motorIds.map(String)).size) {
+    return undefined;
+  }
+
+  const locationIds = sortedUnique(items.map(item => item.locationId));
+  return {
+    signature: groupSignature(locationIds),
+    locationIds,
+    label,
+    threshold: 1,
+  };
 }
 
 export function collectGroupCandidates(

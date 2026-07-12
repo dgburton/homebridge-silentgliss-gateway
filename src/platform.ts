@@ -25,13 +25,29 @@ import {
   canonicalKind,
   collectGroupCandidates,
   ControllerAction,
+  explicitGroupCandidate,
   groupSignature,
   managedGroupName,
   MotorMetadata,
   NativeGroup,
   nativeGroupConfiguration,
+  motorIdsForGroup,
+  planDiscreteControllerActions,
   planControllerActions,
 } from './controllerCommands';
+import {
+  ExternalCommandApi,
+  ExternalCommandError,
+  ExternalCommandRequest,
+  ExternalCommandResult,
+} from './externalCommandApi';
+
+interface ExternalMovementSession {
+  motorIds: string[];
+  groupSignatures: Record<number, string>;
+  individualMotorIds: string[];
+  expiresAt: number;
+}
 
 export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
@@ -47,6 +63,11 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   private groupLearningStatePath = '';
   private groupLearningStateReady: Promise<void> = Promise.resolve();
   private lastStateErrorLogAt = 0;
+  private externalCommandApi?: ExternalCommandApi;
+  private readonly externalMovementSessions = new Map<string, ExternalMovementSession>();
+  private readonly externalCommandResults = new Map<string, { expiresAt: number; result: ExternalCommandResult }>();
+  private controllerSendQueue: Promise<void> = Promise.resolve();
+  private groupLearningQueue: Promise<void> = Promise.resolve();
   
   constructor(
     public readonly log: Logger,
@@ -83,12 +104,21 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
       this.log.debug('Executed didFinishLaunching callback');
       this.discoverDevices();
       void this.refreshNativeGroups();
+      void this.startExternalCommandApi();
 
       this.updateStateTimeout = setTimeout(this.updateState.bind(this), STATE_REFRESH_INTERVAL_MS);
 
     });
 
-    this.api.on('shutdown', () => this.commandBatcher.dispose());
+    this.api.on('shutdown', () => {
+      this.commandBatcher.dispose();
+      if (this.updateStateTimeout) {
+        clearTimeout(this.updateStateTimeout);
+      }
+      void this.externalCommandApi?.stop();
+      this.externalMovementSessions.clear();
+      this.externalCommandResults.clear();
+    });
   }
 	
   updateState() {
@@ -372,6 +402,12 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   }
 
   private async sendControllerActions(actions: ControllerAction[]): Promise<void> {
+    const operation = this.controllerSendQueue.then(() => this.postControllerActions(actions));
+    this.controllerSendQueue = operation.catch(() => undefined);
+    await operation;
+  }
+
+  private async postControllerActions(actions: ControllerAction[]): Promise<void> {
     const body = `command=${JSON.stringify(actions)}\r\n`;
     await rp({
       method: 'POST',
@@ -383,6 +419,180 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
       body,
       timeout: 5000,
     });
+  }
+
+  private async startExternalCommandApi(): Promise<void> {
+    if (this.config.commandApiPort === undefined) {
+      this.log.debug('Silent Gliss local command API is not configured');
+      return;
+    }
+
+    const port = Number(this.config.commandApiPort);
+    if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+      this.log.error(`Invalid Silent Gliss commandApiPort: ${this.config.commandApiPort}`);
+      return;
+    }
+
+    const token = String(this.config.commandApiToken ?? '');
+    if (token.length < 16) {
+      this.log.error('Silent Gliss commandApiToken must contain at least 16 characters');
+      return;
+    }
+
+    this.externalCommandApi = new ExternalCommandApi(
+      port,
+      token,
+      this.log,
+      this.handleExternalCommand.bind(this),
+    );
+    try {
+      await this.externalCommandApi.start();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log.error(`Could not start Silent Gliss local command API: ${message}`);
+      this.externalCommandApi = undefined;
+    }
+  }
+
+  private async handleExternalCommand(command: ExternalCommandRequest): Promise<ExternalCommandResult> {
+    this.pruneExternalCommandState();
+    const cached = this.externalCommandResults.get(command.requestId);
+    if (cached) {
+      return { ...cached.result, deduplicated: true };
+    }
+
+    const requestedMotorIds = Array.from(new Set(command.motorIds.map(String)));
+    const unknownMotorIds = requestedMotorIds.filter(motorId => !this.motorMetadata.has(motorId));
+    if (unknownMotorIds.length > 0) {
+      throw new ExternalCommandError(
+        this.motorMetadata.size === 0 ? 503 : 400,
+        `unknown motor ID(s) for controller ${this.config.address}: ${unknownMotorIds.join(',')}`,
+      );
+    }
+
+    let plan;
+    if (command.action === 'stop') {
+      const session = this.externalMovementSessions.get(command.sessionId);
+      plan = session ? this.planStopForExternalSession(session) :
+        planDiscreteControllerActions(requestedMotorIds, 'stop', this.nativeGroups, this.motorMetadata);
+    } else {
+      plan = planDiscreteControllerActions(
+        requestedMotorIds,
+        command.action,
+        this.nativeGroups,
+        this.motorMetadata,
+      );
+    }
+
+    if (plan.actions.length === 0) {
+      throw new ExternalCommandError(400, 'command produced no controller actions');
+    }
+
+    await this.sendControllerActions(plan.actions);
+
+    if (command.action === 'stop') {
+      this.externalMovementSessions.delete(command.sessionId);
+    } else {
+      this.externalMovementSessions.set(command.sessionId, this.createExternalSession(requestedMotorIds, plan));
+    }
+
+    const mode = plan.groupIds.length === 0 ? 'motors' : plan.motorIds.length === 0 ? 'group' : 'mixed';
+    const result: ExternalCommandResult = {
+      accepted: true,
+      controller: String(this.config.address),
+      requestId: command.requestId,
+      sessionId: command.sessionId,
+      action: command.action,
+      mode,
+      groupIds: plan.groupIds,
+      motorIds: plan.motorIds,
+    };
+    this.externalCommandResults.set(command.requestId, { expiresAt: Date.now() + 300000, result });
+
+    const actionSummary = plan.actions.map(action => {
+      if (action.gid !== undefined) {
+        const group = this.nativeGroups.find(item => item.id === action.gid);
+        return `${group?.name ?? 'group'} (#${action.gid})`;
+      }
+      return `motor #${action.mid}`;
+    }).join(', ');
+    this.log.info(
+      `Controller ${this.config.address} accepted ${command.source} ${command.action} for ` +
+      `${command.label} via ${mode}: ${actionSummary}`,
+    );
+
+    if (command.action !== 'stop' && this.config.autoGroups !== false) {
+      const candidate = explicitGroupCandidate(requestedMotorIds, command.label, this.motorMetadata);
+      if (candidate) {
+        void this.observeGroupCandidate(candidate).catch(error => {
+          const message = error instanceof Error ? error.message : String(error);
+          this.log.warn(`Could not learn explicit Silent Gliss group ${command.label}: ${message}`);
+        });
+      }
+    }
+
+    return result;
+  }
+
+  private createExternalSession(
+    requestedMotorIds: string[],
+    plan: { groupIds: number[]; motorIds: string[] },
+  ): ExternalMovementSession {
+    const groupSignatures: Record<number, string> = {};
+    for (const groupId of plan.groupIds) {
+      const group = this.nativeGroups.find(item => item.id === groupId);
+      if (group) {
+        groupSignatures[groupId] = groupSignature(group.locationIds);
+      }
+    }
+    return {
+      motorIds: requestedMotorIds,
+      groupSignatures,
+      individualMotorIds: plan.motorIds,
+      expiresAt: Date.now() + 120000,
+    };
+  }
+
+  private planStopForExternalSession(session: ExternalMovementSession) {
+    const actions: ControllerAction[] = [];
+    const groupIds: number[] = [];
+    const remainingMotorIds = new Set(session.motorIds);
+
+    for (const [groupIdText, signature] of Object.entries(session.groupSignatures)) {
+      const groupId = Number(groupIdText);
+      const group = this.nativeGroups.find(item => item.id === groupId);
+      if (!group || groupSignature(group.locationIds) !== signature) {
+        continue;
+      }
+      const groupMotorIds = motorIdsForGroup(group, this.motorMetadata);
+      if (groupMotorIds.length < 2 || !groupMotorIds.every(motorId => remainingMotorIds.has(motorId))) {
+        continue;
+      }
+      actions.push({ action: 'stop', gid: groupId });
+      groupIds.push(groupId);
+      groupMotorIds.forEach(motorId => remainingMotorIds.delete(motorId));
+    }
+
+    const motorIds = Array.from(remainingMotorIds);
+    for (const motorId of motorIds) {
+      actions.push({ action: 'stop', mid: Number(motorId) });
+    }
+
+    return { actions, groupIds, motorIds };
+  }
+
+  private pruneExternalCommandState(): void {
+    const now = Date.now();
+    for (const [sessionId, session] of this.externalMovementSessions) {
+      if (session.expiresAt <= now) {
+        this.externalMovementSessions.delete(sessionId);
+      }
+    }
+    for (const [requestId, cached] of this.externalCommandResults) {
+      if (cached.expiresAt <= now) {
+        this.externalCommandResults.delete(requestId);
+      }
+    }
   }
 
   private async refreshNativeGroups(): Promise<void> {
@@ -408,70 +618,90 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   }
 
   private async learnNativeGroups(requests: MoveRequest[]): Promise<void> {
-    await this.groupLearningStateReady;
     const candidates = collectGroupCandidates(requests, this.motorMetadata);
 
     for (const candidate of candidates) {
-      const alreadyExists = this.nativeGroups.some(group =>
-        groupSignature(group.locationIds) === candidate.signature,
-      );
-      if (alreadyExists) {
-        if (this.groupCandidateCounts.delete(candidate.signature)) {
-          await this.persistGroupCandidateCounts();
-        }
-        continue;
-      }
-
-      const observationCount = (this.groupCandidateCounts.get(candidate.signature) ?? 0) + 1;
-      this.groupCandidateCounts.set(candidate.signature, observationCount);
-      await this.persistGroupCandidateCounts();
-      if (observationCount < candidate.threshold) {
-        continue;
-      }
-
-      if (this.nativeGroups.length >= 64) {
-        this.log.warn('Silent Gliss group capacity reached; continuing with multi-motor command arrays');
-        return;
-      }
-
-      const usedIds = new Set(this.nativeGroups.map(group => group.id));
-      let groupId = 1;
-      while (usedIds.has(groupId) && groupId <= 64) {
-        groupId++;
-      }
-      if (groupId > 64) {
-        return;
-      }
-
-      const name = managedGroupName(candidate);
-      // Deleted group slots retain their previous sync configuration on the controller.
-      // Always reset it explicitly so a learned group cannot inherit stale calibration data.
-      const payload = [nativeGroupConfiguration(groupId, name, candidate.locationIds)];
-      const body = `group=${JSON.stringify(payload)}`;
-      await rp({
-        method: 'POST',
-        uri: `http://${this.config.address}/command.jcf`,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Content-Length': body.length,
-        },
-        body,
-        timeout: 5000,
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-      await this.refreshNativeGroups();
-      const created = this.nativeGroups.some(group =>
-        group.id === groupId && groupSignature(group.locationIds) === candidate.signature,
-      );
-      if (!created) {
-        throw new Error(`controller did not persist group ${groupId}`);
-      }
-
-      this.groupCandidateCounts.delete(candidate.signature);
-      await this.persistGroupCandidateCounts();
-      this.log.info(`Created managed Silent Gliss group ${name} with ${candidate.locationIds.length} covering(s)`);
+      await this.observeGroupCandidate(candidate);
     }
+  }
+
+  private async observeGroupCandidate(candidate: {
+    signature: string;
+    locationIds: number[];
+    label: string;
+    threshold: number;
+  }): Promise<void> {
+    const operation = this.groupLearningQueue.then(() => this.performObserveGroupCandidate(candidate));
+    this.groupLearningQueue = operation.catch(() => undefined);
+    await operation;
+  }
+
+  private async performObserveGroupCandidate(candidate: {
+    signature: string;
+    locationIds: number[];
+    label: string;
+    threshold: number;
+  }): Promise<void> {
+    await this.groupLearningStateReady;
+    const alreadyExists = this.nativeGroups.some(group =>
+      groupSignature(group.locationIds) === candidate.signature,
+    );
+    if (alreadyExists) {
+      if (this.groupCandidateCounts.delete(candidate.signature)) {
+        await this.persistGroupCandidateCounts();
+      }
+      return;
+    }
+
+    const observationCount = (this.groupCandidateCounts.get(candidate.signature) ?? 0) + 1;
+    this.groupCandidateCounts.set(candidate.signature, observationCount);
+    await this.persistGroupCandidateCounts();
+    if (observationCount < candidate.threshold) {
+      return;
+    }
+
+    if (this.nativeGroups.length >= 64) {
+      this.log.warn('Silent Gliss group capacity reached; continuing with multi-motor command arrays');
+      return;
+    }
+
+    const usedIds = new Set(this.nativeGroups.map(group => group.id));
+    let groupId = 1;
+    while (usedIds.has(groupId) && groupId <= 64) {
+      groupId++;
+    }
+    if (groupId > 64) {
+      return;
+    }
+
+    const name = managedGroupName(candidate);
+    // Deleted group slots retain their previous sync configuration on the controller.
+    // Always reset it explicitly so a learned group cannot inherit stale calibration data.
+    const payload = [nativeGroupConfiguration(groupId, name, candidate.locationIds)];
+    const body = `group=${JSON.stringify(payload)}`;
+    await rp({
+      method: 'POST',
+      uri: `http://${this.config.address}/command.jcf`,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': body.length,
+      },
+      body,
+      timeout: 5000,
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await this.refreshNativeGroups();
+    const created = this.nativeGroups.some(group =>
+      group.id === groupId && groupSignature(group.locationIds) === candidate.signature,
+    );
+    if (!created) {
+      throw new Error(`controller did not persist group ${groupId}`);
+    }
+
+    this.groupCandidateCounts.delete(candidate.signature);
+    await this.persistGroupCandidateCounts();
+    this.log.info(`Created managed Silent Gliss group ${name} with ${candidate.locationIds.length} covering(s)`);
   }
 
   private async loadGroupCandidateCounts(): Promise<void> {

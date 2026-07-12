@@ -2,6 +2,8 @@ export interface SilentGlissConfig {
 	address?: string;
 	verboseDebug?: boolean;
 	autoGroups?: boolean;
+	commandApiPort?: number;
+	commandApiToken?: string;
 }
 
 export interface SilentGlissBlind {

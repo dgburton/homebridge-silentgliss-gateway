@@ -4,10 +4,12 @@ import { MoveRequest } from '../commandBatcher';
 import {
   canonicalKind,
   collectGroupCandidates,
+  explicitGroupCandidate,
   managedGroupName,
   MotorMetadata,
   NativeGroup,
   nativeGroupConfiguration,
+  planDiscreteControllerActions,
   planControllerActions,
 } from '../controllerCommands';
 
@@ -48,6 +50,37 @@ test('falls back to individual actions inside one controller command array', () 
     { action: 'moveto', mid: 1, position: '750' },
     { action: 'moveto', mid: 3, position: '750' },
   ]);
+});
+
+test('uses native groups for physical open, close, and stop commands', () => {
+  assert.deepEqual(planDiscreteControllerActions(['1', '2'], 'open', groups, metadata).actions, [
+    { action: 'open', gid: 1 },
+  ]);
+  assert.deepEqual(planDiscreteControllerActions(['1', '2'], 'close', groups, metadata).actions, [
+    { action: 'close', gid: 1 },
+  ]);
+  assert.deepEqual(planDiscreteControllerActions(['1', '2'], 'stop', groups, metadata).actions, [
+    { action: 'stop', gid: 1 },
+  ]);
+});
+
+test('splits a controller-spanning local subset into the best group plus remaining motors', () => {
+  const plan = planDiscreteControllerActions(['1', '2', '3'], 'close', [groups[0]], metadata);
+  assert.deepEqual(plan.actions, [
+    { action: 'close', gid: 1 },
+    { action: 'close', mid: 3 },
+  ]);
+  assert.deepEqual(plan.groupIds, [1]);
+  assert.deepEqual(plan.motorIds, ['3']);
+});
+
+test('treats an explicit physical-switch mapping as a first-observation group candidate', () => {
+  assert.deepEqual(explicitGroupCandidate(['2', '1'], 'Kitchen Romans', metadata), {
+    signature: '10,11',
+    locationIds: [10, 11],
+    label: 'Kitchen Romans',
+    threshold: 1,
+  });
 });
 
 test('requires repeated exact observations before learning persistent groups', () => {
