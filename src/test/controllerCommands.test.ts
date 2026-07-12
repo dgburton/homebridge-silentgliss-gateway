@@ -7,6 +7,7 @@ import {
   managedGroupName,
   MotorMetadata,
   NativeGroup,
+  nativeGroupConfiguration,
   planControllerActions,
 } from '../controllerCommands';
 
@@ -55,9 +56,21 @@ test('requires repeated exact observations before learning persistent groups', (
   const sceneCandidate = candidates.find(candidate => candidate.locationIds.join(',') === '10,11,12');
 
   assert.equal(romanCandidate?.threshold, 2);
+  assert.equal(romanCandidate?.label, 'Kitchen roman');
   assert.equal(sceneCandidate?.threshold, 2);
   assert.ok(sceneCandidate);
   assert.ok(managedGroupName(sceneCandidate).length <= 15);
+});
+
+test('resets stale synchronization fields when reusing a controller group slot', () => {
+  assert.deepEqual(nativeGroupConfiguration(7, 'HB_Study', [19, 12]), {
+    id: 7,
+    name: 'HB_Study',
+    lid: [12, 19],
+    synchro: 0,
+    master: 12,
+    syncposition: [0, 0],
+  });
 });
 
 test('normalizes Roman, Privacy, Roller, and Blackout location suffixes', () => {

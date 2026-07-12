@@ -27,6 +27,7 @@ import {
   managedGroupName,
   MotorMetadata,
   NativeGroup,
+  nativeGroupConfiguration,
   planControllerActions,
 } from './controllerCommands';
 
@@ -416,7 +417,9 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
       }
 
       const name = managedGroupName(candidate);
-      const payload = [{ id: groupId, name, lid: candidate.locationIds }];
+      // Deleted group slots retain their previous sync configuration on the controller.
+      // Always reset it explicitly so a learned group cannot inherit stale calibration data.
+      const payload = [nativeGroupConfiguration(groupId, name, candidate.locationIds)];
       const body = `group=${JSON.stringify(payload)}`;
       await rp({
         method: 'POST',

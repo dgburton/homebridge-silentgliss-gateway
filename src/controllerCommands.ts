@@ -13,6 +13,15 @@ export interface NativeGroup {
   locationIds: number[];
 }
 
+export interface NativeGroupConfiguration {
+  id: number;
+  name: string;
+  lid: number[];
+  synchro: 0;
+  master: number;
+  syncposition: number[];
+}
+
 export interface ControllerAction {
   action: 'moveto';
   position: string;
@@ -56,6 +65,26 @@ export function managedGroupName(candidate: GroupCandidate): string {
     hash = Math.imul(hash, 16777619);
   }
   return `HB_${slug}_${(hash >>> 0).toString(16).slice(-4)}`.slice(0, 15);
+}
+
+export function nativeGroupConfiguration(
+  id: number,
+  name: string,
+  locationIds: number[],
+): NativeGroupConfiguration {
+  const lid = sortedUnique(locationIds);
+  if (lid.length === 0) {
+    throw new Error('A Silent Gliss group must contain at least one location');
+  }
+
+  return {
+    id,
+    name,
+    lid,
+    synchro: 0,
+    master: lid[0],
+    syncposition: lid.map(() => 0),
+  };
 }
 
 export function planControllerActions(
@@ -171,7 +200,7 @@ function addCandidate(
   const signature = groupSignature(locationIds);
   const existing = candidates.get(signature);
 
-  if (!existing || threshold < existing.threshold) {
+  if (!existing || threshold <= existing.threshold) {
     candidates.set(signature, { signature, locationIds, label, threshold });
   }
 }
