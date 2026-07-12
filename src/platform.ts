@@ -1,4 +1,6 @@
 import rp from 'request-promise';
+import { readFile, rename, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import {
   API,
   DynamicPlatformPlugin,
@@ -42,6 +44,8 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   private readonly motorMetadata = new Map<string, MotorMetadata>();
   private nativeGroups: NativeGroup[] = [];
   private readonly groupCandidateCounts = new Map<string, number>();
+  private groupLearningStatePath = '';
+  private groupLearningStateReady: Promise<void> = Promise.resolve();
   private lastStateErrorLogAt = 0;
   
   constructor(
@@ -66,6 +70,12 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
     this.uuidCallbacks = {};
     this.config = config;
     this.log = log;
+    const addressKey = String(this.config.address ?? 'unconfigured').replace(/[^a-z0-9.-]/gi, '_');
+    this.groupLearningStatePath = join(
+      this.api.user.storagePath(),
+      `silentgliss-group-learning-${addressKey}.json`,
+    );
+    this.groupLearningStateReady = this.loadGroupCandidateCounts();
 
     this.log.debug('Finished initializing platform:', this.config.name);
 
@@ -385,6 +395,7 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
   }
 
   private async learnNativeGroups(requests: MoveRequest[]): Promise<void> {
+    await this.groupLearningStateReady;
     const candidates = collectGroupCandidates(requests, this.motorMetadata);
 
     for (const candidate of candidates) {
@@ -392,12 +403,15 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
         groupSignature(group.locationIds) === candidate.signature,
       );
       if (alreadyExists) {
-        this.groupCandidateCounts.delete(candidate.signature);
+        if (this.groupCandidateCounts.delete(candidate.signature)) {
+          await this.persistGroupCandidateCounts();
+        }
         continue;
       }
 
       const observationCount = (this.groupCandidateCounts.get(candidate.signature) ?? 0) + 1;
       this.groupCandidateCounts.set(candidate.signature, observationCount);
+      await this.persistGroupCandidateCounts();
       if (observationCount < candidate.threshold) {
         continue;
       }
@@ -442,7 +456,37 @@ export class SilentGlissGatewayPlatform implements DynamicPlatformPlugin {
       }
 
       this.groupCandidateCounts.delete(candidate.signature);
+      await this.persistGroupCandidateCounts();
       this.log.info(`Created managed Silent Gliss group ${name} with ${candidate.locationIds.length} covering(s)`);
+    }
+  }
+
+  private async loadGroupCandidateCounts(): Promise<void> {
+    try {
+      const state = JSON.parse(await readFile(this.groupLearningStatePath, 'utf8')) as Record<string, unknown>;
+      for (const [signature, value] of Object.entries(state)) {
+        if (/^\d+(,\d+)+$/.test(signature) && Number.isInteger(value) && Number(value) > 0) {
+          this.groupCandidateCounts.set(signature, Math.min(Number(value), 2));
+        }
+      }
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT') {
+        const message = error instanceof Error ? error.message : String(error);
+        this.log.warn(`Could not load Silent Gliss group-learning state: ${message}`);
+      }
+    }
+  }
+
+  private async persistGroupCandidateCounts(): Promise<void> {
+    const tempPath = `${this.groupLearningStatePath}.${process.pid}.tmp`;
+    try {
+      const state = Object.fromEntries(this.groupCandidateCounts);
+      await writeFile(tempPath, `${JSON.stringify(state)}\n`, { encoding: 'utf8', mode: 0o600 });
+      await rename(tempPath, this.groupLearningStatePath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log.warn(`Could not save Silent Gliss group-learning state: ${message}`);
     }
   }
 
